@@ -12,17 +12,13 @@
 
 ## 一键部署（推荐）
 
-### 1. Fork 或创建仓库
+点击下面的 Cloudflare 按钮即可将本项目复制到你的 GitHub 账号、创建 Worker，并部署 `backend` 目录中的后端：
 
-将本项目推送到你自己的 **公开或私有** GitHub 仓库。
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fligang2020%2FSub-Store-Workers%2Ftree%2Fmain%2Fbackend)
 
-### 2. 在 Cloudflare 创建 Worker
+> 一键部署会引导你登录 GitHub 和 Cloudflare，并创建你自己的仓库与 Worker。完成后请记录 Cloudflare 分配的 `*.workers.dev` 域名。
 
-1. 在 Cloudflare Dashboard 中进入 **Workers & Pages**。
-2. 创建一个 Worker，或在本地使用下面的 Wrangler 命令直接部署。
-3. 记录部署后的 `*.workers.dev` 域名；也可绑定自己的域名。
-
-### 3. 使用 Wrangler 部署
+### 使用 Wrangler 手动部署
 
 要求：Node.js 22+ 与 pnpm 11。
 
