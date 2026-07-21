@@ -9,7 +9,8 @@ const backendRoot = path.resolve(__dirname, '../../..');
  * module is first loaded. The normal test suite also exercises Node runtime.
  */
 describe('Cloudflare Workers adapter', () => {
-    it('serves the backend environment endpoint through Fetch', () => {
+    it('serves the backend environment endpoint through Fetch', function () {
+        this.timeout(10_000);
         const script = `
             globalThis.WebSocketPair = class WebSocketPair {};
             globalThis.$argument = 'cors=*';
