@@ -67,7 +67,7 @@ pnpm dlx wrangler@4.26.0 deploy
 
 此外，请在 Cloudflare Worker 的 **Variables and Secrets** 中设置 `SUB_STORE_ADMIN_PASSWORD`（不要将该密码作为 GitHub Actions Secret 或写入仓库）。
 
-推送到 `main` 分支时会自动运行 `wrangler deploy`。也可以手动触发 workflow。
+该 workflow 仅可在 GitHub Actions 页面手动触发，不会因为推送到 `main` 而自动部署。若你只使用 Cloudflare 的一键部署或 Dashboard 手动部署，无需配置这些 GitHub Secrets。
 
 ## 配置 CORS
 

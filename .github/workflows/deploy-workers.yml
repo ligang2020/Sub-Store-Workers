@@ -1,12 +1,8 @@
 name: Deploy Cloudflare Worker
 
+# Manual-only: pushing code must not deploy to Cloudflare automatically.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-workers.yml'
 
 permissions:
   contents: read
