@@ -1,0 +1,1583 @@
+<template>
+    <div
+      class="page-wrapper"
+      :style="{ '--icon-fit': formIconFit }"
+      @click="handleEditGlobalClick"
+    >
+      <div
+        v-if="editorTabsEnabled"
+        class="editor-section-tabs"
+        :style="{ top: navBarHeight }"
+      >
+        <div class="editor-section-tab-list" role="tablist">
+          <button
+            v-for="tab in FILE_EDITOR_TABS"
+            :key="tab"
+            type="button"
+            class="editor-section-tab"
+            :class="{ current: activeEditorTab === tab }"
+            role="tab"
+            :aria-selected="activeEditorTab === tab"
+            @click="activeEditorTab = tab"
+          >
+            {{ $t(`editorPage.subConfig.editorTabs.${tab}`) }}
+          </button>
+        </div>
+        <EditorGroupingTips />
+      </div>
+      <!-- 基础表单 -->
+      <div
+        v-show="isFileFormTabActive"
+        class="form-block-wrapper"
+      >
+        <div
+          v-if="appearanceSetting.isShowIcon && (!editorTabsEnabled || activeEditorTab === 'display')"
+          class="sticky-title-icon-container"
+        >
+          <nut-image
+            :class="{ 'sub-item-customer-icon': !isIconColor }"
+            :src="fileIcon"
+            :fit="formIconFit"
+            show-loading
+            @click="showIconPopup"
+          />
+        </div>
+        <nut-form class="form" :model-value="form" ref="ruleForm">
+          <div v-show="!editorTabsEnabled || activeEditorTab === 'display'" class="editor-tab-content">
+          <!-- name -->
+          <nut-form-item
+            required
+            :label="$t(`editorPage.subConfig.basic.name.label`)"
+            prop="name"
+            :rules="[
+              {
+                required: true,
+                message: $t(`editorPage.subConfig.basic.name.isEmpty`),
+              },
+              {
+                validator: nameValidator,
+                message: $t(`editorPage.subConfig.basic.name.isInvalid`),
+              },
+            ]"
+          >
+            <input
+              class="nut-input-text"
+              data-1p-ignore
+              @blur="customerBlurValidate('name')"
+              v-model.trim="form.name"
+              :placeholder="$t(`editorPage.subConfig.basic.name.placeholder`)"
+              type="text"
+            />
+          </nut-form-item>
+          <!-- displayName -->
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.displayName.label`)"
+            prop="displayName"
+          >
+            <input
+              class="nut-input-text"
+              data-1p-ignore
+              v-model.trim="form.displayName"
+              :placeholder="$t(`editorPage.subConfig.basic.displayName.placeholder`)"
+              type="text"
+            />
+          </nut-form-item>
+          <nut-form-item
+            :label="$t(`filePage.download.label`)"
+            prop="download"
+            class="ignore-failed-wrapper"
+          >
+            <div class="switch-wrapper">
+              <nut-switch v-model="form.download" />
+            </div>
+          </nut-form-item>
+          <!-- remark -->
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.remark.label`)"
+            prop="remark"
+          >
+            <nut-textarea
+              class="nut-input-text"
+              :border="false"
+              v-model="form.remark"
+              :placeholder="$t(`editorPage.subConfig.basic.remark.placeholder`)"
+              type="text"
+              input-align="right"
+              rows="1"
+              :autosize="{ maxHeight: 140 }"
+              max-length="100"
+            />
+          </nut-form-item>
+        <!-- tag -->
+        <nut-form-item
+          :label="$t(`editorPage.subConfig.basic.tag.label`)"
+          prop="tag"
+        >
+          <nut-input
+            class="nut-input-text"
+            v-model.trim="form.tag"
+            :border="false"
+            :placeholder="$t(`editorPage.subConfig.basic.tag.placeholder`)"
+            type="text"
+            input-align="right"
+            right-icon="rect-right"
+            @click-right-icon="showTagPopup('tag')"
+          >
+          </nut-input>
+        </nut-form-item>
+          <!-- icon -->
+          <nut-form-item :label="$t(`editorPage.subConfig.basic.icon.label`)" prop="icon">
+            <nut-input
+              :border="false"
+              class="nut-input-text"
+              v-model.trim="form.icon"
+              :placeholder="$t(`editorPage.subConfig.basic.icon.placeholder`)"
+              type="text"
+              input-align="right"
+              left-icon="shop"
+              @click-left-icon="showIconPopup"
+            />
+          </nut-form-item>
+          <!-- isIconColor -->
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.isIconColor.label`)"
+            prop="isIconColor"
+            class="ignore-failed-wrapper"
+          >
+            <div class="switch-wrapper">
+              <nut-switch v-model="form.isIconColor" />
+            </div>
+          </nut-form-item>
+          <ImageFitPicker v-model="form.iconFit" :fallback-value="appearanceSetting.iconFit" />
+          </div>
+          <div v-show="!editorTabsEnabled || activeEditorTab === 'content'" class="editor-tab-content">
+          <nut-form-item required :label="$t(`specificWord.type`)" prop="type">
+            <div class="radio-wrapper">
+              <nut-radiogroup v-model="form.type" direction="horizontal">
+                <nut-radio shape="button" :label="MIHOMO_CONFIG_FILE_TYPE">
+                  {{ $t(`filePage.type.mihomoConfig`) }}
+                </nut-radio>
+                <nut-radio shape="button" label="file">
+                  {{ $t(`specificWord.file`) }}
+                </nut-radio>
+              </nut-radiogroup>
+            </div>
+          </nut-form-item>
+          <template v-if="isMihomoConfigFile">
+            <nut-form-item
+              required
+              :label="$t(`editorPage.subConfig.basic.source.label`)"
+              prop="source"
+            >
+              <div class="radio-wrapper">
+                <nut-radiogroup
+                  v-model="form.sourceType"
+                  direction="horizontal"
+                  @change="handleTypeChange"
+                >
+                  <nut-radio shape="button" label="subscription">
+                    {{ $t(`specificWord.singleSub`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="collection">
+                    {{ $t(`specificWord.collectionSub`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="remote">
+                    {{ $t(`filePage.source.remote`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="local">
+                    {{ $t(`filePage.source.local`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="none">
+                    {{ $t(`specificWord.none`) }}
+                  </nut-radio>
+                </nut-radiogroup>
+              </div>
+            </nut-form-item>
+            <nut-form-item
+              v-if="mihomoConfigSubscriptionSourceTypes.includes(form.sourceType)"
+              required
+              :label="$t(`editorPage.subConfig.sourceNameInputLabel`)"
+              prop="sourceName"
+              :rules="[
+                {
+                  required: true,
+                  message: $t(`editorPage.subConfig.basic.name.isEmpty`),
+                },
+              ]"
+            >
+              <nut-input
+                class="nut-input-text source-name-input"
+                :border="false"
+                data-1p-ignore
+                @blur="customerBlurValidate('sourceName')"
+                input-align="right"
+                v-model.trim="form.sourceName"
+                :placeholder="$t(`editorPage.subConfig.sourceNameInputLabel`)"
+                type="text"
+                right-icon="rect-right"
+                @click-right-icon="showSourceName"
+              />
+            </nut-form-item>
+            <nut-form-item
+              v-if="isMihomoConfigFileSource"
+              :label="$t(`filePage.mode.label`)"
+              prop="mode"
+            >
+              <div class="radio-wrapper">
+                <nut-radiogroup direction="horizontal" v-model="form.mode">
+                  <nut-radio shape="button" label="config">
+                    {{ $t(`filePage.mode.config`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="proxy">
+                    {{ $t(`filePage.mode.proxy`) }}
+                  </nut-radio>
+                </nut-radiogroup>
+              </div>
+            </nut-form-item>
+            <template
+              v-if="showIncludeUnsupportedProxy"
+            >
+              <nut-form-item class="ignore-failed-wrapper">
+                <template #label>
+                  <span
+                    class="label-with-tip"
+                    @click="includeUnsupportedProxyTips"
+                  >
+                    <span>{{
+                      $t(`syncPage.addArtForm.includeUnsupportedProxy.label`)
+                    }}</span>
+                    <nut-icon name="tips"></nut-icon>
+                  </span>
+                </template>
+                <div class="switch-wrapper">
+                  <nut-switch v-model="form.includeUnsupportedProxy" />
+                </div>
+              </nut-form-item>
+            </template>
+          </template>
+          <template v-if="showFileSourceFields">
+            <nut-form-item
+              v-if="!isMihomoConfigFile"
+              required
+              :label="$t(`editorPage.subConfig.basic.source.label`)"
+              prop="source"
+            >
+              <div class="radio-wrapper">
+                <nut-radiogroup direction="horizontal" v-model="form.source">
+                  <nut-radio shape="button" label="remote">
+                    {{ $t(`filePage.source.remote`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="local">
+                    {{ $t(`filePage.source.local`) }}
+                  </nut-radio>
+                </nut-radiogroup>
+              </div>
+            </nut-form-item>
+            <nut-form-item
+              required
+              v-if="fileSourceMode === 'remote'"
+              prop="url"
+              :rules="[
+                {
+                  required: true,
+                  message: $t(`filePage.url.isEmpty`),
+                },
+                {
+                  validator: urlValidator,
+                  message: $t(`filePage.url.isIllegal`),
+                },
+              ]"
+            >
+              <template #label>
+                <span class="label-tips" @click="fileUrlTips">
+                  <p>{{ $t(`editorPage.subConfig.basic.url.label`) }}</p>
+                  <span class="tips">
+                    <span>{{ $t(`editorPage.subConfig.basic.url.tips.label`) }}</span>
+                  </span>
+                </span>
+              </template>
+              <nut-textarea
+                class="textarea-wrapper"
+                @blur="customerBlurValidate('url')"
+                v-model="form.url"
+                :autosize="{ maxHeight: 110, minHeight: 50 }"
+                :placeholder="$t(`filePage.url.placeholder`)"
+                type="text"
+              />
+            </nut-form-item>
+            <nut-form-item
+              v-else-if="fileSourceMode === 'local'"
+              :label="undefined"
+              prop="content"
+            >
+              <!-- <nut-textarea
+              class="textarea-wrapper"
+              v-model="form.content"
+              text-align="left"
+              :autosize="{ maxHeight: 410, minHeight: 50 }"
+              :placeholder="$t(`filePage.content.placeholder`)"
+              type="text"
+            /> -->
+
+              <div
+                style="
+                  margin-left: -15px;
+                  margin-right: -15px;
+                  max-height: 60vh;
+                  overflow: auto;
+                "
+              >
+                <cmView
+                  :isReadOnly="false"
+                  id="FileEditer"
+                  :editor-language="form.editorLanguage"
+                  @update:editor-language="setEditorLanguage"
+                />
+              </div>
+            </nut-form-item>
+            <!-- ua -->
+            <nut-form-item
+              :label="$t(`editorPage.subConfig.basic.ua.label`)"
+              prop="ua"
+              v-if="fileSourceMode === 'remote'"
+            >
+              <input
+                class="nut-input-text"
+                v-model.trim="form.ua"
+                :placeholder="$t(`editorPage.subConfig.basic.ua.placeholder`)"
+                type="text"
+              />
+            </nut-form-item>
+            <nut-form-item
+              :label="$t(`editorPage.subConfig.basic.proxy.label`)"
+              prop="proxy"
+            >
+              <nut-input
+                :border="false"
+                class="nut-input-text"
+                v-model.trim="form.proxy"
+                :placeholder="$t(`editorPage.subConfig.basic.proxy.placeholder`)"
+                type="text"
+                input-align="right"
+                left-icon="tips"
+                @click-left-icon="proxyTips"
+              />
+            </nut-form-item>
+            <nut-form-item
+              :label="$t(`editorPage.subConfig.basic.source.mergeSources`)"
+              prop="mergeSources"
+            >
+              <div class="radio-wrapper">
+                <nut-radiogroup direction="horizontal" v-model="form.mergeSources">
+                  <nut-radio shape="button" label="">
+                    {{ $t(`editorPage.subConfig.basic.source.noMerge`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="localFirst">
+                    {{ $t(`editorPage.subConfig.basic.source.localFirst`) }}
+                  </nut-radio>
+                  <nut-radio shape="button" label="remoteFirst">
+                    {{ $t(`editorPage.subConfig.basic.source.remoteFirst`) }}
+                  </nut-radio>
+                </nut-radiogroup>
+              </div>
+            </nut-form-item>
+          </template>
+
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.subInfoUrl.label`)"
+            prop="subInfoUrl"
+          >
+            <nut-input
+              :border="false"
+              class="nut-input-text"
+              data-1p-ignore
+              v-model.trim="form.subInfoUrl"
+              :placeholder="$t(`editorPage.subConfig.basic.subInfoUrl.placeholder`)"
+              type="text"
+              input-align="right"
+              left-icon="tips"
+              @click-left-icon="subInfoUrlTips"
+            />
+          </nut-form-item>
+          <nut-form-item
+            :label="$t(`editorPage.subConfig.basic.subInfoUserAgent.label`)"
+            prop="subInfoUserAgent"
+          >
+            <input
+              class="nut-input-text"
+              data-1p-ignore
+              v-model.trim="form.subInfoUserAgent"
+              :placeholder="
+                $t(`editorPage.subConfig.basic.subInfoUserAgent.placeholder`)
+              "
+              type="text"
+            />
+          </nut-form-item>
+          <nut-form-item prop="age-public-key">
+            <template #label>
+              <span class="label-with-tip" @click="ageOutputTips">
+                <span>{{ $t("ageKey.publicKey.label") }}</span>
+                <nut-icon name="tips"></nut-icon>
+              </span>
+            </template>
+            <div class="age-key-field">
+              <nut-input
+                :border="false"
+                class="nut-input-text"
+                v-model.trim="form['age-public-key']"
+                :placeholder="$t('ageKey.publicKey.placeholder')"
+                type="text"
+                input-align="right"
+              />
+              <AgeKeyHelper v-model="form['age-public-key']" />
+            </div>
+          </nut-form-item>
+          <nut-form-item
+            :label="$t(`filePage.ignoreFailedRemoteFile.label`)"
+            prop="ignoreFailedRemoteFile"
+          >
+            <nut-input
+              :model-value="fileFailureModeLabel"
+              :border="false"
+              class="nut-input-text failure-mode-input"
+              readonly
+              input-align="right"
+              right-icon="rect-right"
+              @click="openFileFailureModePicker"
+              @click-right-icon="openFileFailureModePicker"
+            />
+          </nut-form-item>
+          </div>
+        </nut-form>
+      </div>
+      <div
+        v-show="!editorTabsEnabled || activeEditorTab === 'actions'"
+        class="editor-tab-content editor-actions-content"
+        :class="{
+          'editor-tab-fixed-offset': editorTabsEnabled,
+        }"
+      >
+        <ActionBlock
+          ref="actionBlockRef"
+          :checked="actionsChecked"
+          :list="actionsList"
+          sourceType="file"
+          :action-tip="isMihomoConfigFile ? $t(`filePage.type.mihomoConfigScriptActionTips`) : ''"
+          action-tip-url="https://mihomo.party/docs/guide/override"
+          :action-tip-link-text="$t(`subPage.panel.tips.ok`)"
+          @updateCustomNameModeFlag="updateCustomNameModeFlag"
+          @addAction="addAction"
+          @deleteAction="deleteAction"
+          @toggleAction="toggleAction"
+        />
+      </div>
+    </div>
+
+    <div class="bottom-btn-wrapper">
+      <nut-button @click="compare" class="compare-btn btn" plain shape="square">
+        <font-awesome-icon icon="fa-solid fa-eye" />
+        {{ $t("editorPage.subConfig.btn.compare") }}
+      </nut-button>
+      <nut-button @click="submit" class="submit-btn btn" type="primary" shape="square">
+        <font-awesome-icon icon="fa-solid fa-floppy-disk" />
+        {{ $t("editorPage.subConfig.btn.save") }}
+      </nut-button>
+    </div>
+  <FilePreview
+    v-if="filePreviewIsVisible"
+    :name="configName"
+    :previewData="previewData"
+    :showRefresh="true"
+    @closePreview="closePreview"
+    @refresh="refreshPreview"
+  />
+  <icon-popup v-model:visible="iconPopupVisible" @setIcon="setIcon">
+  </icon-popup>
+  <!-- 订阅名称 -->
+  <DesktopPicker
+    :key="sourceNameColumns.length"
+    v-model="selectSourceName"
+    v-model:visible="showSourceNamePicker"
+    :columns="sourceNameColumns"
+    :title="$t(`editorPage.subConfig.sourceNamePicker.title`)"
+    :cancel-text="$t(`editorPage.subConfig.sourceNamePicker.cancel`)"
+    :ok-text="$t(`editorPage.subConfig.sourceNamePicker.confirm`)"
+    @confirm="handleSourceNameConfirm"
+  >
+    <div v-if="!sourceNameColumns.length" class="empty-tips" @click="goAddSub">
+      <p>{{ t(`editorPage.subConfig.sourceNamePicker.emptyTips`) }}</p>
+    </div>
+  </DesktopPicker>
+  <DesktopPicker
+    v-model="selectedFileFailureMode"
+    v-model:visible="showFileFailureModePicker"
+    :columns="fileFailureModeColumns"
+    :title="$t(`filePage.ignoreFailedRemoteFile.label`)"
+    :cancel-text="$t(`editorPage.subConfig.sourceNamePicker.cancel`)"
+    :ok-text="$t(`editorPage.subConfig.sourceNamePicker.confirm`)"
+    @confirm="handleFileFailureModeConfirm"
+  />
+  <tag-popup
+    v-model:visible="tagPopupVisible"
+    ref="tagPopupRef"
+    :currentTag="currentTag"
+    @setTag="setTagValue"
+    type="file">
+  </tag-popup>
+</template>
+
+<script lang="ts" setup>
+import { useArtifactsStore } from "@/store/artifacts";
+import logoIcon from "@/assets/icons/logo.png";
+import logoRedIcon from "@/assets/icons/logo-red.png";
+import { useSubsApi } from "@/api/subs";
+import { useFilesApi } from "@/api/files";
+import { usePopupRoute } from "@/hooks/usePopupRoute";
+import { useAppNotifyStore } from "@/store/appNotify";
+import { useGlobalStore } from "@/store/global";
+import { useSettingsStore } from "@/store/settings";
+import { useSubsStore } from "@/store/subs";
+import { useSystemStore } from "@/store/system";
+import ActionBlock from "@/views/editor/ActionBlock.vue";
+import { addItem, deleteItem, toggleItem } from "@/utils/actionsOperate";
+import { actionsToProcess } from "@/utils/actionsToPorcess";
+import Script from "@/views/editor/components/Script.vue";
+import AddProxiesFromSubscription from "@/views/editor/components/AddProxiesFromSubscription.vue";
+import TagPopup from "@/components/TagPopup.vue";
+import AgeKeyHelper from "@/components/AgeKeyHelper.vue";
+import EditorGroupingTips from "@/components/EditorGroupingTips.vue";
+import ImageFitPicker from "@/components/ImageFitPicker.vue";
+import IconPopup from "@/views/icon/IconPopup.vue";
+import FilePreview from "@/views/FilePreview.vue";
+import DesktopPicker from "@/components/DesktopPicker.vue";
+import { initStores } from "@/utils/initApp";
+import {
+  getEditorActiveTab,
+  setEditorActiveTab,
+} from "@/utils/editorTabState";
+import { getEditorTabForValidationErrors } from "@/utils/editorTabValidation";
+import { Dialog, Toast } from "@nutui/nutui";
+import { storeToRefs } from "pinia";
+import {
+  computed,
+  provide,
+  reactive,
+  ref,
+  shallowRef,
+  toRaw,
+  watchEffect,
+  watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
+import cmView from "@/views/editCode/cmView.vue";
+import { useCodeStore } from "@/store/codeStore";
+import clashmetaIcon from '@/assets/icons/clashmeta_color.png';
+import { createGithubProxyUrlRewriter } from "@/utils/githubProxy";
+import {
+  isMihomoConfigFileType,
+  MIHOMO_CONFIG_FILE_TYPE,
+  normalizeFileType,
+} from "@/utils/fileType";
+import { formatPreviewError } from "@/utils/previewError";
+import { normalizeOptionalImageFit, resolveImageFit } from "@/utils/iconFit";
+
+const cmStore = useCodeStore();
+const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
+const FILE_EDITOR_TAB_STORAGE_KEY = "file-editor-active-tab";
+const FILE_EDITOR_TABS = ["display", "content", "actions"] as const;
+type FileEditorTab = (typeof FILE_EDITOR_TABS)[number];
+const FILE_EDITOR_PROP_TO_TAB: Partial<Record<string, FileEditorTab>> = {
+  name: "display",
+  displayName: "display",
+  remark: "display",
+  tag: "display",
+  icon: "display",
+  isIconColor: "display",
+  iconFit: "display",
+  subInfoUrl: "content",
+  subInfoUserAgent: "content",
+  type: "content",
+  source: "content",
+  sourceType: "content",
+  sourceName: "content",
+  mode: "content",
+  url: "content",
+  content: "content",
+  ua: "content",
+  proxy: "content",
+  mergeSources: "content",
+  download: "content",
+  "age-public-key": "content",
+  ignoreFailedRemoteFile: "content",
+};
+const subsApi = useSubsApi();
+const filesApi = useFilesApi();
+const configName = route.params.id as string;
+const subsStore = useSubsStore();
+const { showNotify } = useAppNotifyStore();
+
+const globalStore = useGlobalStore();
+const systemStore = useSystemStore();
+const settingsStore = useSettingsStore();
+const { bottomSafeArea } = storeToRefs(globalStore);
+const { navBarHeight } = storeToRefs(systemStore);
+const { subs, collections } = storeToRefs(subsStore);
+const { appearanceSetting, githubProxy, githubProxyRegex } = storeToRefs(settingsStore);
+const padding = bottomSafeArea.value + "px";
+const routeConfigName = computed(() => route.params.id as string);
+const UNTITLED_FILE_NAMES = ["UNTITLED", "UNTITLED-mihomoConfig", "UNTITLED-mihomoProfile"];
+const UNTITLED_MIHOMO_CONFIG_FILE_NAMES = ["UNTITLED-mihomoConfig", "UNTITLED-mihomoProfile"];
+const isEditMode = computed(() => !UNTITLED_FILE_NAMES.includes(routeConfigName.value));
+const editorGroupingMode = computed<EditorGroupingMode>(() => appearanceSetting.value.editorGroupingMode || "edit-only");
+const editorTabsEnabled = computed(() => {
+  if (editorGroupingMode.value === "disabled") return false;
+  if (editorGroupingMode.value === "always") return true;
+  return isEditMode.value;
+});
+const getFileEditorActiveTab = (path: string) => {
+  if (!isEditMode.value) {
+    return "display";
+  }
+
+  return getEditorActiveTab(
+    FILE_EDITOR_TAB_STORAGE_KEY,
+    path,
+    FILE_EDITOR_TABS,
+    "display",
+  );
+};
+const activeEditorTab = ref(getFileEditorActiveTab(route.path));
+const isFileFormTabActive = computed(() => {
+  return !editorTabsEnabled.value || ["display", "content"].includes(activeEditorTab.value);
+});
+watch(
+  [() => route.path, isEditMode],
+  ([path]) => {
+    activeEditorTab.value = getFileEditorActiveTab(path);
+  },
+  { immediate: true },
+);
+watch(activeEditorTab, (tab) => {
+  if (!isEditMode.value) return;
+
+  setEditorActiveTab(FILE_EDITOR_TAB_STORAGE_KEY, route.path, tab);
+});
+const setActiveFileEditorTab = (tab: FileEditorTab) => {
+  if (!editorTabsEnabled.value) return;
+
+  activeEditorTab.value = tab;
+};
+const focusValidationErrorTab = (errors: unknown) => {
+  const tab = getEditorTabForValidationErrors(errors, FILE_EDITOR_PROP_TO_TAB);
+  if (tab) {
+    setActiveFileEditorTab(tab);
+  }
+};
+
+let scrollTop = 0;
+
+const file = computed(() => subsStore.getOneFile(configName));
+const filePreviewIsVisible = ref(false);
+usePopupRoute(filePreviewIsVisible);
+const previewData = ref();
+const isInit = ref(false);
+const ruleForm = ref<any>(null);
+const actionsChecked = reactive([]);
+const actionsList = reactive([]);
+const isget = ref(false);
+const hasUntagged = ref(false);
+const tags = computed(() => {
+  if(!subsStore.files || subsStore.files.length === 0) return []
+  const set = new Set()
+  subsStore.files.forEach(file => {
+    if (Array.isArray(file.tag) && file.tag.length > 0) {
+      file.tag.forEach(i => {
+        set.add(i)
+      });
+    } else {
+      hasUntagged.value = true
+    }
+  })
+
+  let tags: any[] = Array.from(set)
+  if(tags.length === 0) return []
+  tags = tags.map(i => ({ label: i, value: i }));
+  const result = [{ label: t("specificWord.all"), value: "all" }, ...tags]
+  if(hasUntagged.value) result.push({ label: t("specificWord.untagged"), value: "untagged" })
+  return result
+});
+const tag = ref('all');
+const tagPopupVisible = ref(false);
+const tagType = ref('tag');
+const tagPopupRef = ref(null);
+const currentTag = computed(() => {
+  return form.tag
+})
+const fileFailureModeOptions = computed(() => {
+  const prefix = "filePage.ignoreFailedRemoteFile";
+  return [
+    {
+      value: "disabled",
+      label: t(`${prefix}.disabled`),
+      note: t(`${prefix}.disabledNote`),
+    },
+    {
+      value: "enabled",
+      label: t(`${prefix}.enabled`),
+      note: t(`${prefix}.enabledNote`),
+    },
+    {
+      value: "quiet",
+      label: t(`${prefix}.quiet`),
+      note: t(`${prefix}.quietNote`),
+    },
+  ];
+});
+const formatFailureModePickerText = (label: string, note?: string) => {
+  if (!note) return label;
+  return locale.value.startsWith("zh")
+    ? `${label}（${note}）`
+    : `${label} (${note})`;
+};
+const fileFailureModeValue = computed(() => {
+  return form.ignoreFailedRemoteFile === false || form.ignoreFailedRemoteFile == null
+    ? "disabled"
+    : form.ignoreFailedRemoteFile;
+});
+const fileFailureModeColumns = computed(() => {
+  return fileFailureModeOptions.value.map((option) => ({
+    text: formatFailureModePickerText(option.label, option.note),
+    value: option.value,
+  }));
+});
+const fileFailureModeLabel = computed(() => {
+  return fileFailureModeOptions.value.find(
+    (option) => option.value === fileFailureModeValue.value
+  )?.label || "";
+});
+const showFileFailureModePicker = ref(false);
+const selectedFileFailureMode = ref<string[]>([]);
+const openFileFailureModePicker = () => {
+  selectedFileFailureMode.value = [fileFailureModeValue.value];
+  showFileFailureModePicker.value = true;
+};
+const handleFileFailureModeConfirm = ({ selectedValue }) => {
+  const nextValue =
+    selectedValue[0] ?? fileFailureModeColumns.value[0]?.value ?? "disabled";
+  selectedFileFailureMode.value = [nextValue];
+  form.ignoreFailedRemoteFile = nextValue;
+  showFileFailureModePicker.value = false;
+};
+const showTagPopup = (type:string) => {
+  tagType.value = type || 'tag'
+  tagPopupVisible.value = true
+};
+const setTagValue = (tag: any) => {
+  form.tag = tag;      
+};
+const form = reactive<any>({
+  name: "",
+  displayName: "",
+  remark: "",
+  icon: "",
+  isIconColor: true,
+  iconFit: undefined,
+  source: "local",
+  sourceType: "collection",
+  sourceName: "",
+  mode: "config",
+  includeUnsupportedProxy: false,
+  process: [],
+  type: UNTITLED_MIHOMO_CONFIG_FILE_NAMES.includes(configName) ? MIHOMO_CONFIG_FILE_TYPE : 'file',
+});
+provide("form", form);
+const mihomoConfigFileSourceTypes = ["local", "remote"];
+const mihomoConfigSubscriptionSourceTypes = ["subscription", "collection"];
+const mihomoConfigSourceTypes = [
+  ...mihomoConfigFileSourceTypes,
+  ...mihomoConfigSubscriptionSourceTypes,
+  "none",
+];
+const isMihomoConfigFile = computed(() => isMihomoConfigFileType(form.type));
+const isMihomoConfigFileSource = computed(() => {
+  return isMihomoConfigFile.value && mihomoConfigFileSourceTypes.includes(form.sourceType);
+});
+const normalizeFormSourceType = (sourceData: any, type: string) => {
+  if (!isMihomoConfigFileType(type)) {
+    return sourceData.sourceType || "collection";
+  }
+
+  return mihomoConfigSourceTypes.includes(sourceData.sourceType)
+    ? sourceData.sourceType
+    : "collection";
+};
+const showFileSourceFields = computed(() => {
+  return form.type === "file" || isMihomoConfigFileSource.value;
+});
+const fileSourceMode = computed(() => {
+  return isMihomoConfigFile.value ? form.sourceType : form.source;
+});
+const showIncludeUnsupportedProxy = computed(() => {
+  return (
+    isMihomoConfigFile.value &&
+    (
+      mihomoConfigSubscriptionSourceTypes.includes(form.sourceType) ||
+      (isMihomoConfigFileSource.value && form.mode === "proxy")
+    )
+  );
+});
+// 排除非动作卡片
+const ignoreList = ["Quick Setting Operator"];
+const MIHOMO_ONLY_FILE_ACTION_TYPES = ["Add Proxies From Subscription Operator"];
+const normalizeProcessByFileType = (data: any) => {
+  if (isMihomoConfigFileType(data.type)) return;
+
+  data.process = (data.process || []).filter(
+    (item) => !MIHOMO_ONLY_FILE_ACTION_TYPES.includes(item.type),
+  );
+};
+// 订阅名称
+const showSourceNamePicker = ref(false);
+const selectSourceName = computed(() => [form.sourceName]);
+const sourceNameColumns = computed(() => {
+  const list = form.sourceType === "collection"
+    ? subsStore.collections
+    : form.sourceType === "subscription"
+      ? subsStore.subs
+      : [];
+  if (!list || list.length === 0) {
+    return [];
+  }
+  return list.map((item) => {
+    return {
+      text: item.displayName ? `${item.displayName}` : item.name,
+      value: item.name,
+    };
+  });
+});
+const handleTypeChange = (val) => {
+  form.sourceName = "";
+  if (mihomoConfigFileSourceTypes.includes(val) && !form.mode) {
+    form.mode = "config";
+  }
+};
+const showSourceName = () => {
+  showSourceNamePicker.value = true;
+};
+const handleSourceNameConfirm = ({ selectedValue, selectedOptions }) => {
+  if (selectedValue[0]) {
+    form.sourceName = selectedValue[0];
+  }
+  showSourceNamePicker.value = false;
+};
+const goAddSub = () => {
+  router.push("/subs");
+};
+watch(
+  () => cmStore.EditCode["FileEditer"],
+  (newCode) => {
+    form.content = newCode;
+  }
+);
+
+watchEffect(() => {
+  if (isInit.value) return;
+  if (UNTITLED_FILE_NAMES.includes(configName)) {
+    const fc = "// " + t(`filePage.content.placeholder`) + "\n";
+    cmStore.setEditCode("FileEditer", fc);
+    // 标记 加载完成
+    isInit.value = true;
+    return;
+  }
+
+  const sourceData: any = toRaw(file.value);
+  if (sourceData) {
+    if (!Array.isArray(sourceData.process)) {
+      sourceData.process = [];
+    }
+    form.name = sourceData.name;
+    form.displayName = sourceData.displayName || sourceData["display-name"];
+    form.remark = sourceData.remark;
+    form.icon = sourceData.icon;
+    form.isIconColor = sourceData.isIconColor !== false;
+    form.iconFit = normalizeOptionalImageFit(sourceData.iconFit);
+    form.editorLanguage = sourceData.editorLanguage;
+    form["age-public-key"] = sourceData["age-public-key"] || "";
+    form.source = sourceData.source || "local";
+    const fileType = normalizeFileType(sourceData.type || 'file') || 'file';
+    form.type = fileType;
+    form.sourceType = normalizeFormSourceType(sourceData, fileType);
+    form.sourceName = sourceData.sourceName;
+    form.mode = sourceData.mode || 'config';
+    form.includeUnsupportedProxy = sourceData.includeUnsupportedProxy === true;
+    form.url = sourceData.url;
+    form.subInfoUrl = sourceData.subInfoUrl;
+    form.subInfoUserAgent = sourceData.subInfoUserAgent;
+    form.proxy = sourceData.proxy;
+    form.tag = Array.isArray(sourceData.tag)
+    ? sourceData.tag.join(", ")
+    : sourceData.tag;
+    form.ua = sourceData.ua;
+    form.mergeSources = sourceData.mergeSources;
+    form.content = sourceData.content;
+    cmStore.setEditCode("FileEditer", sourceData.content);
+    let ignoreFailedRemoteFile = sourceData.ignoreFailedRemoteFile;
+    if (ignoreFailedRemoteFile === true) {
+      ignoreFailedRemoteFile = 'quiet';
+    } else if (ignoreFailedRemoteFile === false || ignoreFailedRemoteFile == null) {
+      ignoreFailedRemoteFile = 'disabled';
+    }
+    form.ignoreFailedRemoteFile = ignoreFailedRemoteFile;
+    form.download = sourceData.download;
+    const newProcess = JSON.parse(JSON.stringify(sourceData.process));
+    form.process = newProcess;
+    if (sourceData.process.length > 0) {
+      form.process.forEach((item) => {
+        const { type, id, customName, disabled } = item;
+        actionsChecked.push([id, type !== "Response Transformer"]);
+        const action = {
+          type,
+          id,
+          customName,
+          tipsDes: t(`editorPage.subConfig.nodeActions['${type}'].tipsDes`),
+          component: null,
+          enabled: !disabled,
+        };
+        switch (type) {
+          case "Script Operator":
+          case "Response Transformer":
+            action.component = shallowRef(Script);
+            break;
+          case "Add Proxies From Subscription Operator":
+            action.component = shallowRef(AddProxiesFromSubscription);
+            break;
+          default:
+            break;
+        }
+        actionsList.push(action);
+      });
+    }
+    // 标记 加载完成
+    isInit.value = true;
+    console.log('form', form);
+    return;
+  }
+});
+
+const addAction = (val) => {
+  addItem(form, actionsList, actionsChecked, val, t);
+};
+
+const setEditorLanguage = (language) => {
+  form.editorLanguage = language || null;
+};
+
+const deleteAction = (id) => {
+  deleteItem(form, actionsList, actionsChecked, id);
+};
+
+const toggleAction = (id) => {
+  toggleItem(actionsList, id);
+};
+
+const closePreview = () => {
+  document.querySelector("html").style["overflow-y"] = "";
+  document.querySelector("html").style.height = "";
+  document.body.style.height = "";
+  document.body.style["overflow-y"] = "";
+  (document.querySelector("#app") as HTMLElement).style["overflow-y"] = "";
+  (document.querySelector("#app") as HTMLElement).style.height = "";
+
+  filePreviewIsVisible.value = false;
+
+  window.scrollTo({
+    top: scrollTop,
+    behavior: "instant" as any,
+  });
+
+  router.back();
+};
+const compare = () => {
+  ruleForm.value.validate().then(async ({ valid, errors }: any) => {
+    // 如果验证失败
+    if (!valid) {
+      focusValidationErrorTab(errors);
+      Dialog({
+        title: t(`editorPage.subConfig.pop.errorTitle`),
+        content: errors[0].message,
+        popClass: "auto-dialog",
+        noCancelBtn: true,
+        okText: t(`editorPage.subConfig.pop.errorBtn`),
+        // @ts-ignore
+        closeOnClickOverlay: true,
+      });
+      return;
+    }
+
+    await fetchPreviewData();
+    openPreviewPanel();
+  });
+};
+
+const fetchPreviewData = async () => {
+  Toast.loading("生成中...", { id: "compare", cover: true, duration: 1500 });
+  try {
+    const data: any = JSON.parse(JSON.stringify(toRaw(form)));
+    data.process = actionsToProcess(data.process, actionsList, ignoreList);
+    if (data.ignoreFailedRemoteFile === "disabled") {
+      data.ignoreFailedRemoteFile = false;
+    }
+    data.tag = [
+      ...new Set(
+        (data.tag || "")
+          .split(",")
+          .map((item: string) => item.trim())
+          .filter((item: string) => item.length)
+      ),
+    ];
+    actionsChecked.forEach((item) => {
+      if (!item[1]) {
+        const index = data.process.findIndex((i) => i.id === item[0]);
+        if (index > -1) {
+          data.process.splice(index, 1);
+        }
+      }
+    });
+    normalizeProcessByFileType(data);
+    const res = await subsApi.compareSub("file", data);
+    if (res?.data?.status === "success") {
+      previewData.value = res.data.data;
+    } else {
+      previewData.value = { processed: formatPreviewError(res) };
+    }
+  } catch (e) {
+    console.error(e);
+    previewData.value = { processed: formatPreviewError(e) };
+  }
+  Toast.hide("compare");
+};
+
+const openPreviewPanel = () => {
+  scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+  globalStore.setSavedPositions(route.path, { left: 0, top: scrollTop });
+
+  document.querySelector("html").style["overflow-y"] = "hidden";
+  document.querySelector("html").style.height = "100%";
+  document.body.style.height = "100%";
+  document.body.style["overflow-y"] = "hidden";
+  (document.querySelector("#app") as HTMLElement).style["overflow-y"] = "hidden";
+  (document.querySelector("#app") as HTMLElement).style.height = "100%";
+
+  filePreviewIsVisible.value = true;
+};
+
+const refreshPreview = async () => {
+  await fetchPreviewData();
+};
+
+const submit = () => {
+  if (isget.value) {
+    showNotify({
+      type: "success",
+      title: "请勿重复点击...",
+    });
+    return;
+  }
+  ruleForm.value.validate().then(async ({ valid, errors }: any) => {
+    isget.value = true;
+    // 如果验证失败
+    if (!valid) {
+      isget.value = false;
+      focusValidationErrorTab(errors);
+      Dialog({
+        title: t(`editorPage.subConfig.pop.errorTitle`),
+        content: errors[0].message,
+        popClass: "auto-dialog",
+        noCancelBtn: true,
+        okText: t(`editorPage.subConfig.pop.errorBtn`),
+        // @ts-ignore
+        closeOnClickOverlay: true,
+      });
+      return;
+    }
+    Toast.loading("...", { id: "submits", cover: true, duration: 1500 });
+    // 如果验证成功，开始保存/修改
+    const data: any = JSON.parse(JSON.stringify(toRaw(form)));
+    data.type = normalizeFileType(data.type);
+    const iconFit = normalizeOptionalImageFit(form.iconFit);
+    if (iconFit) {
+      data.iconFit = iconFit;
+    } else if (UNTITLED_FILE_NAMES.includes(configName)) {
+      delete data.iconFit;
+    } else {
+      data.iconFit = null;
+    }
+    const agePublicKey = `${data["age-public-key"] || ""}`.trim();
+    if (agePublicKey) {
+      data["age-public-key"] = agePublicKey;
+    } else if (UNTITLED_FILE_NAMES.includes(configName)) {
+      delete data["age-public-key"];
+    } else {
+      data["age-public-key"] = null;
+    }
+    data.tag = [
+      ...new Set(
+        (data.tag || "")
+          .split(",")
+          .map((item: string) => item.trim())
+          .filter((item: string) => item.length)
+      ),
+    ];
+    data["display-name"] = data.displayName;
+    data.process = actionsToProcess(data.process, actionsList, ignoreList);
+    normalizeProcessByFileType(data);
+    if (data.ignoreFailedRemoteFile === "disabled"){
+      data.ignoreFailedRemoteFile = false;
+    }
+
+    let res = null;
+
+    if (UNTITLED_FILE_NAMES.includes(configName)) {
+      res = await filesApi.createFile(data);
+      await subsStore.fetchSubsData();
+      if (data.source === "remote" || (isMihomoConfigFileType(data.type) && data.sourceType === "remote")) await initStores(false, true, false);
+    } else {
+      res = await filesApi.editFile(configName, data);
+
+      if (configName === data.name) {
+        // @ts-ignore
+        await subsStore.updateOneData("files", configName);
+      } else {
+        await subsStore.fetchSubsData();
+        await useArtifactsStore().fetchArtifactsData();
+      }
+    }
+
+    if (res?.data?.status === "success") {
+      router.replace("/files").then(() => {
+        if (res)
+          showNotify({
+            type: "success",
+            title: t(`editorPage.subConfig.pop.succeedMsg`),
+          });
+      });
+    }
+    isget.value = false;
+    Toast.hide("submits");
+  });
+};
+const proxyTips = () => {
+  Dialog({
+    title: "通过代理/节点/策略获取远程文件",
+    content:
+      '1. Surge/Egern(参数 policy/policy-descriptor)\n\n可设置节点代理 例: Test = snell, 1.2.3.4, 80, psk=password, version=4\n\n或设置策略/节点 例: 国外加速\n\n2. Loon(参数 node)\n\nLoon 官方文档: \n\n指定该请求使用哪一个节点或者策略组（可以是节点名称、策略组名称，也可以是一个 Loon 格式的节点描述，如：shadowsocksr,example.com,1070,chacha20-ietf,"password",protocol=auth_aes128_sha1,protocol-param=test,obfs=plain,obfs-param=edge.microsoft.com）\n\n3. Stash(参数 headers["X-Surge-Policy"])/Shadowrocket(参数 headers.X-Surge-Policy)/QX(参数 opts.policy)\n\n可设置策略/节点\n\n4. Node.js 版(http/https/socks5):\n\n例: socks5://a:b@127.0.0.1:7890\n\n※ 优先级由高到低: 文件配置, 默认配置\n\n完整说明 请查看 https://telegram.me/zhetengsha/1843',
+    popClass: "auto-dialog",
+    textAlign: "left",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnPopstate: true,
+    lockScroll: false,
+  });
+};
+const includeUnsupportedProxyTips = () => {
+  window.open(
+    "https://github.com/sub-store-org/Sub-Store/wiki/%E9%93%BE%E6%8E%A5%E5%8F%82%E6%95%B0%E8%AF%B4%E6%98%8E"
+  );
+};
+const subInfoUrlTips = () => {
+  Dialog({
+    title: t(`editorPage.subConfig.basic.subInfoUrl.tips.title`),
+    content: t(`editorPage.subConfig.basic.subInfoUrl.tips.content`),
+    popClass: "auto-dialog",
+    textAlign: "left",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnPopstate: true,
+    lockScroll: false,
+  });
+};
+const fileUrlTips = () => {
+  Dialog({
+    title: t("filePage.url.tips.title"),
+    content: t("filePage.url.tips.content"),
+    popClass: "auto-dialog",
+    textAlign: "left",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnPopstate: true,
+    lockScroll: false,
+  });
+};
+const ageOutputTips = () => {
+  Dialog({
+    title: t("ageKey.publicKey.tips.title"),
+    content: t("ageKey.publicKey.tips.content"),
+    popClass: "auto-dialog",
+    textAlign: "left",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnPopstate: true,
+    lockScroll: false,
+  });
+};
+// 图标
+const fileIcon = computed(() => {
+  if (form.icon) {
+    return rewriteGithubUrl(form.icon);
+  } else {
+    if (isMihomoConfigFile.value) return clashmetaIcon;
+    return rewriteGithubUrl(appearanceSetting.value.isDefaultIcon ? logoIcon : logoRedIcon);
+  }
+});
+const githubUrlRewriter = computed(() => {
+  return createGithubProxyUrlRewriter(githubProxy.value, githubProxyRegex.value);
+});
+const rewriteGithubUrl = (url?: string | null) => {
+  return githubUrlRewriter.value(url);
+};
+const isIconColor = computed(() => {
+  return form.isIconColor;
+});
+const formIconFit = computed(() => resolveImageFit(form.iconFit, appearanceSetting.value.iconFit));
+const iconPopupVisible = ref(false);
+const showIconPopup = () => {
+  iconPopupVisible.value = true;
+};
+const setIcon = (icon: any) => {
+  form.icon = icon.url;
+};
+// 名称验证器
+const nameValidator = (val: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (UNTITLED_FILE_NAMES.includes(val)) resolve(false);
+    if (/\//.test(val)) {
+      resolve(false);
+    }
+    const nameList = subsStore.files.map((item) => item.name);
+    nameList.includes(val) && configName !== val ? resolve(false) : resolve(true);
+  });
+};
+
+// url 格式验证器
+const urlValidator = (val: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (/\n/.test(val)) {
+      resolve(
+        val
+          .split(/[\r\n]+/)
+          .map((i) => i.trim())
+          .filter((i) => i.length)
+          .every((i) => /^(http|https):\/\/\S+$/.test(i) || /^\/api\/(file|module)\/(.+)/.test(i) || /^\/.+/.test(i))
+      );
+    } else {
+      resolve(/^(http|https):\/\/\S+$/.test(val) || /^\/api\/(file|module)\/(.+)/.test(val) || /^\/.+/.test(val));
+    }
+  });
+};
+// 失去焦点触发验证
+const customerBlurValidate = (prop: string) => {
+  ruleForm.value.validate(prop);
+};
+const actionBlockRef = ref(null);
+const customNameModeFlag = ref(false);
+const updateCustomNameModeFlag = (flag) => (customNameModeFlag.value = flag);
+const handleEditGlobalClick = () => {
+  if (actionBlockRef.value) {
+    if (customNameModeFlag.value) {
+      // exit
+      actionBlockRef.value.exitAllEditName();
+    }
+  }
+};
+</script>
+
+<style lang="scss" scoped>
+.page-wrapper {
+  padding: 0 var(--safe-area-side) calc(v-bind("padding") + 63px) var(--safe-area-side);
+
+  :deep(.nut-cell-group__warp) {
+    border-radius: var(--item-card-radios);
+  }
+
+  :deep(.nut-icon-tips:before),
+  :deep(.nut-icon-shop:before) {
+    cursor: pointer;
+  }
+}
+
+.radio-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+
+  :deep(.nut-radiogroup) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 5px;
+  }
+
+  :deep(.nut-radio) {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    line-height: 1;
+  }
+
+  :deep(.nut-radio__button.false) {
+    background: var(--divider-color);
+    border-color: transparent;
+    color: var(--second-text-color);
+  }
+
+  :deep(.nut-radio__button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 30px;
+    padding: 0 9px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+}
+
+.form-block-wrapper {
+  position: relative;
+
+  .sticky-title-icon-container {
+    display: flex;
+    justify-content: center;
+
+    .nut-image {
+      cursor: pointer;
+      width: 70px;
+      height: 70px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: transparent;
+      padding: 10px;
+
+      :deep(img) {
+        width: 100%;
+        height: 100%;
+        border-radius: 12px;
+      }
+    }
+
+    .sub-item-customer-icon {
+      :deep(img) {
+        & {
+          opacity: 0.8;
+          filter: brightness(var(--img-brightness));
+        }
+      }
+    }
+  }
+  :deep(.nut-form-item__label) {
+    width: auto;
+  }
+  :deep(.nut-input-text){
+    .nut-input-inner {
+      .nut-input-right-icon {
+        margin-left: 10px;
+      }
+    }
+  }
+
+  .label-with-tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+
+    :deep(.nut-icon) {
+      color: inherit;
+    }
+
+    :deep(.nut-icon-tips) {
+      display: inline-flex;
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      line-height: 20px;
+    }
+  }
+
+  .label-tips {
+    display: inline-flex;
+    flex-direction: column;
+    cursor: pointer;
+
+    .tips {
+      display: inline-flex;
+      align-items: center;
+
+      span {
+        color: var(--primary-color);
+        text-decoration: underline;
+        font-size: 12px;
+      }
+    }
+  }
+}
+.actions-title-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  color: var(--comment-text-color);
+  .doc {
+    margin-left: 4px;
+    color: var(--primary-text-color);
+  }
+}
+
+.bottom-btn-wrapper {
+  position: fixed;
+  display: flex;
+  justify-content: space-between;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 8px var(--safe-area-side) calc(v-bind("padding") + 8px) var(--safe-area-side);
+  z-index: 20;
+  background: var(--background-color);
+  border-top: 1px solid var(--divider-color);
+  @include centered-fixed-container;
+
+  .btn {
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    svg {
+      margin-right: 4px;
+    }
+  }
+
+  .compare-btn {
+    background: transparent;
+    width: 36%;
+  }
+
+  .submit-btn {
+    width: 62%;
+  }
+}
+
+.ignore-failed-wrapper {
+  flex-direction: row;
+  justify-content: space-between;
+
+  :deep(.nut-form-item__label) {
+    width: auto;
+  }
+
+  .switch-wrapper {
+    display: flex;
+    justify-content: end;
+  }
+}
+
+.failure-mode-input {
+  cursor: pointer;
+
+  :deep(.nut-input-value),
+  :deep(.nut-input-inner),
+  :deep(.nut-input-right-icon) {
+    cursor: pointer;
+  }
+}
+
+.source-name-input {
+  :deep(.nut-input-right-icon) {
+    cursor: pointer;
+  }
+}
+
+.include-subs-wrapper {
+  flex-direction: column;
+
+  :deep(.nut-form-item__label) {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .subs-checkbox-wrapper {
+    flex-direction: row-reverse;
+
+    .subs-checkbox {
+      justify-content: space-between;
+      margin-left: 16px;
+      padding: 16px 0 0 0;
+
+      &:not(:last-child) {
+        padding: 16px 0 16px 0;
+        border-bottom: 1px solid;
+        border-color: var(--divider-color);
+      }
+
+      .sub-img-wrapper {
+        max-width: 100%;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        color: var(--second-text-color);
+
+        span {
+          max-width: 56vw;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 1;
+          word-wrap: break-word;
+          word-break: break-all;
+          overflow: hidden;
+        }
+
+        .sub-item-customer-icon {
+          margin-right: 12px;
+
+          :deep(img) {
+            object-fit: var(--icon-fit, cover);
+
+            &:not(.nut-icon__img) {
+              filter: brightness(var(--img-brightness));
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+.age-key-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.empty-tips {
+  padding: 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-color);
+  p {
+    // color: var(--primary-text-color);
+    color: var(--comment-text-color);
+    font-size: 14px;
+    text-align: center;
+  }
+}
+</style>

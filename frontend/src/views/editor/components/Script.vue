@@ -1,0 +1,904 @@
+<template>
+  <div class="editor-action-card">
+    <div class="type-row">
+      <button
+        type="button"
+        class="content-fold-toggle"
+        :aria-expanded="!isContentFolded"
+        :aria-label="
+          isContentFolded
+            ? $t('moreSettingPage.editorDisplayMode.expanded')
+            : $t('moreSettingPage.editorDisplayMode.collapsed')
+        "
+        @click="toggleContentFold"
+      >
+        <nut-icon
+          :name="isContentFolded ? 'rect-right' : 'rect-down'"
+          size="12px"
+        />
+        <span>
+          {{ $t(`editorPage.subConfig.nodeActions['${type}'].des[0]`) }}
+        </span>
+      </button>
+      <a
+        class="doc-link"
+        href="https://github.com/sub-store-org/Sub-Store/wiki/%E8%84%9A%E6%9C%AC%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E"
+        target="_blank"
+      >
+        {{ $t("subPage.panel.tips.ok") }}
+      </a>
+    </div>
+    <div v-show="!isContentFolded">
+      <nut-radiogroup v-model="value.mode" direction="horizontal">
+        <nut-radio v-for="(key, index) in modeList" :key="index" :label="key">
+          {{
+            $t(`editorPage.subConfig.nodeActions['${type}'].options[${index}]`)
+          }}
+        </nut-radio>
+      </nut-radiogroup>
+
+      <div v-if="value.mode === 'link'" class="input-wrapper">
+        <nut-textarea
+          v-model="value.content"
+          :placeholder="
+            $t(`editorPage.subConfig.nodeActions['${type}'].placeholder`)
+          "
+          :rows="5"
+          autosize
+          @blur="handleLinkValueChange"
+        />
+      </div>
+      <div v-if="value.mode === 'script'" class="local-content-section">
+        <cmView
+          :id="id"
+          :is-read-only="false"
+          :editor-language="scriptEditorLanguage"
+          @update:editor-language="setScriptEditorLanguage"
+        />
+      </div>
+    </div>
+
+    <!-- 参数控制部分 -->
+    <div class="input-wrapper-title">
+      <!-- 参数区域展开开关 -->
+      <div class="title-label">
+        <button
+          class="params-toggle"
+          type="button"
+          :aria-expanded="showKeyValue"
+          @click="toggleShowKeyValue"
+        >
+          <nut-icon
+            class="params-toggle-icon"
+            :name="showKeyValue ? 'rect-down' : 'rect-right'"
+            size="12px"
+          />
+          <span>
+            {{
+              $t(
+                `editorPage.subConfig.nodeActions['${type}'].${
+                  showKeyValue ? 'paramsCollapse' : 'paramsExpand'
+                }`,
+              )
+            }}
+          </span>
+        </button>
+        <font-awesome-icon
+          class="icon"
+          icon="fa-solid fa-circle-question"
+          @click.stop="showParamsEditTips"
+        />
+      </div>
+      <!-- 无缓存开关 - 仅在link模式时显示 -->
+      <div v-if="value.mode === 'link'" class="title-label">
+        <nut-checkbox v-model="params.noCache" class="my-switch" />
+        <button
+          class="switch-label"
+          type="button"
+          @click="toggleNoCache"
+        >
+          {{ $t(`editorPage.subConfig.nodeActions['${type}'].noCache`) }}
+        </button>
+        <font-awesome-icon
+          class="icon"
+          icon="fa-solid fa-circle-question"
+          @click.stop="showNoCacheTips"
+        />
+      </div>
+      <div v-if="value.mode === 'link'" class="title-label">
+        <nut-checkbox v-model="params.insecure" class="my-switch" />
+        <button
+          class="switch-label"
+          type="button"
+          @click="toggleInsecure"
+        >
+          {{ $t(`editorPage.subConfig.nodeActions['${type}'].insecure`) }}
+        </button>
+        <font-awesome-icon
+          class="icon"
+          icon="fa-solid fa-circle-question"
+          @click.stop="showInsecureTips"
+        />
+      </div>
+      <!-- 添加参数按钮 -->
+      <div v-if="showKeyValue" class="button">
+        <div @click="addParameter">
+          {{ $t(`editorPage.subConfig.nodeActions['${type}'].paramsAdd`) }}
+        </div>
+      </div>
+    </div>
+    <ParamsEditor
+      v-model:paramsArguments="paramsArguments"
+      :visible="showKeyValue"
+      :type="type"
+    />
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { Dialog } from "@nutui/nutui";
+import { inject, onMounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
+
+import ParamsEditor from "@/components/ParamsEditor.vue";
+import { usePopupRoute } from "@/hooks/usePopupRoute";
+import { useCodeStore } from "@/store/codeStore";
+import {
+  getEditorIsFolded,
+  setEditorFoldState,
+} from "@/utils/editorFoldState";
+import cmView from "@/views/editCode/cmView.vue";
+import { isMihomoConfigFileType } from "@/utils/fileType";
+
+const { type, id, sourceType } = defineProps<{
+  type: string;
+  id: string;
+  sourceType?: string;
+}>();
+
+const cmStore = useCodeStore();
+
+const { t } = useI18n();
+const route = useRoute();
+
+const form = inject<Sub | Collection>("form");
+
+const modeList = ["link", "script"];
+const SCRIPT_CONTENT_FOLD_STORAGE_KEY = "script-local-content-fold";
+
+const getContentFoldPath = (path = route.path) => {
+  return [path, sourceType || "default", type, id].join(":");
+};
+
+const isContentFolded = ref(
+  getEditorIsFolded(
+    SCRIPT_CONTENT_FOLD_STORAGE_KEY,
+    getContentFoldPath(),
+    false,
+  ),
+);
+
+const toggleContentFold = () => {
+  isContentFolded.value = !isContentFolded.value;
+  setEditorFoldState(
+    SCRIPT_CONTENT_FOLD_STORAGE_KEY,
+    getContentFoldPath(),
+    isContentFolded.value,
+  );
+};
+
+const showKeyValue = ref(false);
+
+const isEditKeyValue = ref(true);
+
+const params = reactive({
+  url: "",
+  arguments: {},
+  noCache: false,
+  insecure: false,
+});
+
+const paramsArguments = ref([]);
+const scriptEditorLanguage = ref();
+
+const getActionItem = () => form.process.find((item) => item.id === id);
+
+const setScriptEditorLanguage = (language) => {
+  scriptEditorLanguage.value = language;
+  const item = getActionItem();
+  if (!item?.args) return;
+
+  if (language) {
+    item.args.editorLanguage = language;
+  } else {
+    delete item.args.editorLanguage;
+  }
+};
+
+const hasArguments = (args) => {
+  return !!args && typeof args === "object" && Object.keys(args).length > 0;
+};
+
+const parseUrlParams = (urlStr) => {
+  let $arguments = {} as any;
+  let otherArguments = {} as any;
+  let noCache = false;
+  let insecure = false;
+  let url = urlStr?.trim() || "";
+
+  // 处理没有参数的情况
+  if (!url) {
+    return { url: "", arguments: {}, noCache: false, insecure: false };
+  }
+  // extract link arguments
+  const rawArgs = url.split('#');
+  try {
+    if (rawArgs.length > 1) {
+        try {
+            // 支持 `#${encodeURIComponent(JSON.stringify({arg1: "1"}))}`
+            $arguments = JSON.parse(decodeURIComponent(rawArgs[1]));
+        } catch (e) {
+            for (const pair of rawArgs[1].split('&')) {
+                const key = pair.split('=')[0];
+                const value = pair.split('=')[1];
+                // 部分兼容之前的逻辑 const value = pair.split('=')[1] || true;
+                $arguments[key] =
+                    value == null || value === ''
+                        ? true
+                        : decodeURIComponent(value);
+            }
+        }
+    }
+  } catch (e) {
+    console.error("Failed to parse URL parameters:", e);
+    $arguments = {};
+  }
+  try {
+    if (rawArgs.length > 2) {
+      for (const pair of rawArgs[2].split('&')) {
+          const key = pair.split('=')[0];
+          const value = pair.split('=')[1];
+          // 部分兼容之前的逻辑 const value = pair.split('=')[1] || true;
+          otherArguments[key] =
+              value == null || value === ''
+                  ? true
+                  : decodeURIComponent(value);
+      }
+      noCache = otherArguments?.noCache;
+      insecure = otherArguments?.insecure;
+    } else if ($arguments?.noCache != null || $arguments?.insecure != null) {
+      noCache = $arguments?.noCache;
+      insecure = $arguments?.insecure;
+      delete $arguments?.noCache;
+      delete $arguments?.insecure;
+    }
+  } catch (e) {
+    console.error("Failed to parse additional URL parameters:", e);
+  }
+
+  return {
+    url: url.split('#')[0],
+    arguments: $arguments,
+    noCache,
+    insecure,
+  };
+};
+
+const buildUrlWithParams = (baseUrl, args, noCache, insecure) => {
+  if (!baseUrl) {
+    if(noCache && insecure){
+      return "##noCache&insecure"
+    }else if(noCache){
+      return "##noCache"
+    }else if(insecure){
+      return "##insecure"
+    } else {
+      return ""
+    }
+  }
+
+  const validArgs = args && typeof args === "object" && Object.keys(args).length > 0;
+
+  // 如果没有参数且不需要noCache，直接返回baseUrl
+  if (!validArgs && !noCache && !insecure) return baseUrl;
+
+  let paramStrings = [];
+
+  if (validArgs) {
+    // 为了一致性，对键名进行排序
+    paramStrings = Object.entries(args)
+      .filter(([key]) => key && typeof key === "string")
+      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+      .map(([key, value]) => {
+        // 处理布尔值 true - 直接输出键名，无等号
+        if (value === true) {
+          return key;
+        }
+
+        // 处理其他值 - 转换为字符串并编码
+        const strValue = value === null || value === undefined ? "" : value.toString();
+        return `${key}=${encodeURIComponent(strValue)}`;
+      });
+  }
+
+  // 构建最终URL
+  let result = baseUrl;
+
+  if (paramStrings.length > 0) {
+    result += `#${paramStrings.join("&")}`;
+  }
+
+  // noCache 标记始终放在末尾
+  if (noCache && insecure) {
+    result += "#noCache&insecure";
+  }else if (noCache) {
+    result += "#noCache";
+  }else if (insecure) {
+    result += "#insecure";
+  }
+
+  return result;
+};
+
+const editorIsVisible = ref(false);
+usePopupRoute(editorIsVisible);
+const value = reactive({
+  mode: "",
+  content: "",
+  code: "",
+});
+
+// 添加参数方法
+const addParameter = () => {
+  const newParamsArguments = [...paramsArguments.value, { key: "", value: "" }];
+  paramsArguments.value = newParamsArguments;
+};
+
+const toggleShowKeyValue = () => {
+  showKeyValue.value = !showKeyValue.value;
+};
+
+const toggleNoCache = () => {
+  params.noCache = !params.noCache;
+};
+
+const toggleInsecure = () => {
+  params.insecure = !params.insecure;
+};
+
+// 显示noCache提示
+const showNoCacheTips = () => {
+  Dialog({
+    title: t(`editorPage.subConfig.nodeActions['${type}'].helpTitle`),
+    content: t(`editorPage.subConfig.nodeActions['${type}'].noCacheTips`),
+    popClass: "auto-dialog",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnClickOverlay: true,
+  });
+};
+const showInsecureTips = () => {
+  Dialog({
+    title: t(`editorPage.subConfig.nodeActions['${type}'].helpTitle`),
+    content: t(`editorPage.subConfig.nodeActions['${type}'].insecureTips`),
+    popClass: "auto-dialog",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnClickOverlay: true,
+  });
+};
+
+// 显示参数编辑提示
+const showParamsEditTips = () => {
+  Dialog({
+    title: t(`editorPage.subConfig.nodeActions['${type}'].helpTitle`),
+    content: t(`editorPage.subConfig.nodeActions['${type}'].paramsEditTips`),
+    popClass: "auto-dialog",
+    okText: "OK",
+    noCancelBtn: true,
+    closeOnClickOverlay: true,
+  });
+};
+
+const handleLinkValueChange = () => {
+  if (value.mode === "link") {
+    try {
+      // 解析参数
+      const parsedParams = parseUrlParams(value.content);
+
+      // 更新URL和noCache状态
+      params.url = parsedParams.url;
+      params.noCache = parsedParams.noCache;
+      params.insecure = parsedParams.insecure;
+
+      // 更新arguments对象
+      params.arguments = parsedParams.arguments || {};
+
+      // 将已解析的参数映射到paramsArguments
+      paramsArguments.value = Object.entries(params.arguments).map(
+        ([key, value]) => ({ key, value: value === true ? "" : value }),
+      );
+
+      // 确保UI显示正确的值
+      isEditKeyValue.value = true;
+
+      console.log("value.content changed, parsed arguments:", params.arguments);
+    } catch (error) {
+      console.error("Failed to parse link content:", error);
+    }
+  }
+};
+let placeholders
+const isMihomoConfigFile =
+  sourceType === "file" && isMihomoConfigFileType((form as any)?.type);
+const mihomoConfigPlaceholder = `// mihomo config override
+// $content already contains the base mihomo config generated from the selected source.
+// YAML and JavaScript override formats are supported.
+// YAML override docs: https://clashparty.org/docs/guide/override/yaml
+// JavaScript override docs: https://clashparty.org/docs/guide/override/javascript
+`;
+if (type === 'Response Transformer') {
+  placeholders = `// Modify Response
+// 1. shortcut script
+$res.status = 200
+$res.header['X-Custom'] = 'new'
+$res.header['X-Powered-By'] = undefined // removeHeader
+$res.body = $res.body
+
+// 2. transform function
+async function transformFunction(res, context) {
+  // res.status: HTTP status code
+  // res.header / res.headers: response headers
+  // res.body: response body
+  // context is shared by response transformers in this run.
+  // Use context.process to control later response transformers by customName.
+  // This control does not cross with Script Operator/File Script context.process.
+  // context.process = { type: 'disable', customNames: ['branch-b'] }
+  // type: 'disable' skips listed customName; type: 'enable' only runs listed customName.
+  return res
+}`
+} else if(sourceType === "file") {
+  placeholders = `${isMihomoConfigFile ? `${mihomoConfigPlaceholder}\n` : ""}// Example:
+// $files: ['0', '1']
+// $content: '0\\n1'
+
+// produce proxies
+// backend version(>2.14.156):
+let singboxProxies = await produceArtifact({
+    type: 'subscription', // type: 'subscription' 或 'collection'
+    name: 'sub', // subscription name
+    platform: 'sing-box', // target platform
+    produceType: 'internal' // 'internal' produces an Array, otherwise produces a String( JSON.parse('JSON String') )
+})
+
+let clashMetaProxies = await produceArtifact({
+    type: 'subscription',
+    name: 'sub',
+    platform: 'ClashMeta',
+    produceType: 'internal' // 'internal' produces an Array, otherwise produces a String( ProxyUtils.yaml.safeLoad('YAML String').proxies )
+})
+
+// Base64 encode
+// $content = ProxyUtils.Base64.encode($content ?? $files[0])
+
+// YAML parse/stringify
+// ProxyUtils.yaml.load('YAML String')
+// ProxyUtils.yaml.safeLoad('YAML String')
+// $content = ProxyUtils.yaml.safeDump({})
+// $content = ProxyUtils.yaml.dump({})
+
+// Example: insert proxies into YAML
+// const yaml = ProxyUtils.yaml.safeLoad($content ?? $files[0])
+// let clashMetaProxies = await produceArtifact({
+//     type: 'collection',
+//     name: '机场',
+//     platform: 'ClashMeta',
+//     produceType: 'internal'
+// })
+// yaml.proxies.unshift(...clashMetaProxies)
+// $content = ProxyUtils.yaml.dump(yaml)
+
+// https://clashparty.org/docs/guide/urlscheme#profile-update-interval
+// if ($options){
+//   $options._res = {
+//     headers: {
+//       'profile-update-interval': 24
+//     }
+//   }
+// } 
+
+
+// JSON
+$content = JSON.stringify({}, null, 2)
+
+// { $content, $files, $options } will be passed to the next operator
+// $content is the final content of the file
+// context is shared by later operators in this run.
+// Use context.process to control later actions by customName.
+// This control does not cross with Response Transformer context.process.
+// context.process = { type: 'disable', customNames: ['branch-b'] }
+// type: 'disable' skips listed customName; type: 'enable' only runs listed customName.
+`
+} else if (type === 'Script Operator') {
+  placeholders = `// Example:
+// Script Operator
+// 1. shortcut script
+$server.name = 'prefix-' + $server.name
+$server.ecn = true
+$server['test-url'] = 'http://1.0.0.1/generate_204'
+// 2. operator function
+async function operator(proxies, targetPlatform, context) {
+  // context is shared by later operators in this run.
+  // Use context.process to control later actions by customName.
+  // This control does not cross with Response Transformer context.process.
+  // context.process = { type: 'disable', customNames: ['branch-b'] }
+  // type: 'disable' skips listed customName; type: 'enable' only runs listed customName.
+  // if ($options) {
+  //   const { headers, url, path } = $options?._req || {}
+  //   const ua = headers?.['user-agent'] || headers?.['User-Agent']
+  //   console.log(ua)
+  //   $options._res = {
+  //     headers: {
+  //       'X-Custom': 'new',
+  //       'X-Powered-By': undefined, // removeHeader
+  //     }
+  //   }
+  // }
+  return proxies.map(proxy => {
+    // Change proxy information here
+
+    return proxy;
+  });
+}`
+} else {
+  placeholders = `// Script Filter
+// 1. shortcut script
+const port = Number($server.port)
+return [80].includes(port)
+
+// 2. filter function
+async function filter(proxies, targetPlatform) {
+  return proxies.map( proxy => {
+    // Return true if the current proxy is selected
+
+    return true;
+  });
+}`
+}
+onMounted(() => {
+  const item = getActionItem();
+  if (item) {
+    item.args = item.args || {};
+    scriptEditorLanguage.value = item.args.editorLanguage;
+    value.mode = item.args.mode;
+    if (item.args.mode === "script") {
+      value.code = item.args.content;
+      cmStore.setEditCode(
+        id,
+        item.args.content ? item.args.content : placeholders,
+      );
+      if (hasArguments(item.args.arguments)) {
+        params.arguments = item.args.arguments;
+        paramsArguments.value = Object.entries(params.arguments).map(
+          ([key, value]) => ({ key, value }),
+        );
+        showKeyValue.value = true;
+      }
+    } else {
+      value.content = item.args.content;
+      const parsedParams = parseUrlParams(value.content);
+      params.url = parsedParams.url;
+      params.arguments = parsedParams.arguments;
+      params.noCache = parsedParams.noCache;
+      params.insecure = parsedParams.insecure;
+      paramsArguments.value = Object.entries(params.arguments).map(
+        ([key, value]) => ({ key, value }),
+      );
+    }
+  }
+});
+
+watch(
+  paramsArguments,
+  (newVal) => {
+    console.log("paramsArguments changed:", newVal);
+    params.arguments = newVal.reduce((acc, cur) => {
+      if (cur.key) {
+        acc[cur.key] = cur.value;
+      }
+      return acc;
+    }, {});
+    if (value.mode === "link") {
+      value.content = buildUrlWithParams(
+        params.url,
+        params.arguments,
+        params.noCache,
+        params.insecure,
+      );
+    }
+    const item = form.process.find((item) => item.id === id);
+    item.args.arguments = params.arguments;
+  },
+  { deep: true },
+);
+
+watch(value, () => {
+  const item = getActionItem();
+  item.args.mode = value.mode;
+
+  if (item.args.mode === "script") {
+    item.args.content = value.code;
+    !cmStore.CodeClear[id] &&
+      cmStore.setEditCode(
+        id,
+        item.args.content ? item.args.content : placeholders,
+      );
+    placeholders = " ";
+
+    item.args.arguments = params.arguments;
+  } else {
+    delete item.args.editorLanguage;
+    scriptEditorLanguage.value = undefined;
+    item.args.content = value.content;
+
+    const parsedParams = parseUrlParams(value.content);
+    params.url = parsedParams.url;
+    params.arguments = parsedParams.arguments;
+    params.noCache = parsedParams.noCache;
+    params.insecure = parsedParams.insecure;
+
+    if (!isEditKeyValue.value) {
+      paramsArguments.value = Object.entries(params.arguments).map(
+        ([key, value]) => ({ key, value }),
+      );
+      isEditKeyValue.value = true;
+    }
+  }
+});
+
+watch(
+  () => params.noCache,
+  (newValue) => {
+    if (value.mode === "link") {
+      value.content = buildUrlWithParams(
+        params.url,
+        params.arguments,
+        newValue,
+        params.insecure,
+      );
+    }
+  },
+);
+watch(
+  () => params.insecure,
+  (newValue) => {
+    if (value.mode === "link") {
+      value.content = buildUrlWithParams(
+        params.url,
+        params.arguments,
+        params.noCache,
+        newValue,
+      );
+    }
+  },
+);
+
+watch(
+  () => params.url,
+  (newValue) => {
+    if (value.mode === "link") {
+      value.content = buildUrlWithParams(
+        newValue,
+        params.arguments,
+        params.noCache,
+        params.insecure,
+      );
+    }
+  },
+);
+
+watch(
+  () => route.path,
+  (path) => {
+    isContentFolded.value = getEditorIsFolded(
+      SCRIPT_CONTENT_FOLD_STORAGE_KEY,
+      getContentFoldPath(path),
+      false,
+    );
+  },
+);
+
+watch(
+  () => cmStore.EditCode[id],
+  (newCode) => {
+    value.code = newCode;
+  },
+);
+</script>
+
+<style lang="scss" scoped>
+.type-row {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.content-fold-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--comment-text-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:focus {
+    outline: none;
+  }
+
+  svg {
+    color: var(--unimportant-icon-color);
+  }
+}
+.doc-link {
+  color: var(--primary-color);
+  font-size: 12px;
+}
+
+.nut-radiogroup {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+
+  > view.nut-textarea {
+    background: transparent;
+    padding: 8px 12px;
+    border-bottom: 1px solid;
+    color: var(--second-text-color);
+    border-color: var(--lowest-text-color);
+
+    :deep(textarea) {
+      color: inherit;
+    }
+  }
+}
+.local-content-section {
+  margin-left: -16px;
+  margin-right: -16px;
+  max-height: 80vh;
+  overflow: auto;
+}
+.input-wrapper-title {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: flex-start;
+  line-height: 1.5;
+
+  .title-label {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: var(--second-text-color);
+    flex-shrink: 0;
+
+    .my-switch {
+      width: 18px;
+      margin-right: 0;
+
+      :deep(.nut-icon) {
+        font-size: 16px;
+      }
+
+      :deep(.nut-checkbox__label) {
+        display: none;
+      }
+    }
+
+    .switch-label {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      padding: 0 0 0 4px;
+      user-select: none;
+    }
+
+    .params-toggle {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font: inherit;
+      padding: 0;
+      user-select: none;
+
+      &:focus {
+        outline: none;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      .params-toggle-icon {
+        color: var(--unimportant-icon-color);
+        flex-shrink: 0;
+      }
+    }
+
+    .icon {
+      margin-left: 4px;
+      color: var(--unimportant-icon-color);
+    }
+  }
+
+  .button {
+    margin-left: auto;
+
+    > div {
+      cursor: pointer;
+      color: var(--primary-color);
+      font-size: 12px;
+    }
+  }
+}
+
+.open-editor-btn {
+  border: 1px solid var(--primary-color);
+  background: transparent;
+  margin: 20px 0 12px 0;
+  padding: 8px 0;
+  text-align: center;
+  width: 100%;
+  border-radius: var(--item-card-radios);
+  color: var(--primary-color);
+  font-weight: bold;
+
+  svg {
+    margin-right: 8px;
+  }
+}
+
+.editor-page-header {
+  padding: var(--safe-area-side);
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 56px;
+
+  button {
+    background: none;
+    border: none;
+    font-size: 20px;
+    padding: 8px;
+    color: var(--danger-color);
+    cursor: pointer;
+
+    &.toggle-plaintext-mode {
+      margin-left: auto;
+    }
+  }
+}
+</style>

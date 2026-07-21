@@ -1,0 +1,146 @@
+interface SubsStoreState {
+  subs: Sub[];
+  collections: Collection[];
+  flows: FlowsDict;
+  files: any[];
+  shares: Share[];
+}
+
+interface FlowsDict {
+  [key: string]: Flow | ErrorResponse;
+}
+
+// 结构有点乱 太难定义
+// type Process1 = {
+//   key: string;
+//   value: boolean;
+// };
+//
+// type Process2 = {
+//   [key: string]: string;
+// };
+
+type ProcessArg = any;
+
+interface Process {
+  type: string;
+  id?: string;
+  customName?: string;
+  args?: ProcessArg;
+  disabled?: boolean;
+}
+
+interface Sub {
+  name: string;
+  content?: string;
+  displayName?: string;
+  remark?: string;
+  url?: string;
+  source: 'remote' | 'local';
+  icon?: string;
+  isIconColor?: boolean;
+  iconFit?: ImageFit | null;
+  ua?: string;
+  mergeSources?: string;
+  subUserinfo?: string;
+  tag?: string[];
+  'age-public-key'?: string;
+  process: Process[];
+}
+
+interface Collection {
+  name: string;
+  displayName?: string;
+  remark?: string;
+  process: Process[];
+  subscriptions: string[];
+  subscriptionTags?: string[];
+  firstSubFlow?: boolean;
+  subUserinfo?: string;
+  proxy?: string;
+  icon?: string;
+  isIconColor?: boolean;
+  iconFit?: ImageFit | null;
+  tag?: string[];
+  'age-public-key'?: string;
+}
+
+interface Artifacts {
+  name: string;
+  displayName?: string;
+  remark?: string;
+  type: string;
+  source: string;
+  platform: string;
+  tag?: string[];
+  sync:boolean;
+  updated:number;
+  url:string;
+}
+
+interface Flow {
+  status: 'success' | 'noFlow';
+  showRemaining?: boolean;
+  hideExpire?: boolean;
+  data: {
+    planName?: string;
+    appUrl?: string;
+    remainingDays?: number;
+    expires?: number;
+    total: number;
+    usage: {
+      upload: number;
+      download: number;
+    };
+  };
+}
+
+interface Share {
+  type?: 'sub' | 'col'| 'file',
+  name?: string;
+  displayName?: string | null;
+  remark?: string | null;
+  tag?: string[];
+  icon?: string | null;
+  isIconColor?: boolean | null;
+  iconFit?: ImageFit | null;
+  token?: string | null;
+  'age-public-key'?: string | null;
+  mode?: 'duration' | 'datetime' | 'count' | null;
+  expiresIn?: string | null;
+  expiresValue?: string | null;
+  expiresUnit?: 'day' | 'month' | 'season' | 'year' | null;
+  expiresAt?: number | null;
+  exp?: number | null;
+  count?: number | null;
+  usedCount?: number | null;
+  createdAt?: number | null;
+}
+
+interface SharePayload {
+  type: 'sub' | 'col' | 'file';
+  name: string;
+  displayName?: string | null;
+  remark?: string | null;
+  tag?: string[];
+  icon?: string | null;
+  isIconColor?: boolean | null;
+  iconFit?: ImageFit | null;
+  token?: string | null;
+  'age-public-key'?: string | null;
+}
+
+interface ShareToken {
+  payload: SharePayload;
+  options?: {
+    expiresIn?: number | string | undefined;
+    expiresValue?: number | string | undefined;
+    expiresUnit?: 'day' | 'month' | 'season' | 'year' | undefined;
+    exp?: number | string | null | undefined;
+    count?: number | string | undefined;
+    usedCount?: number | string | undefined;
+    mode?: 'duration' | 'datetime' | 'count' | undefined;
+  }
+}
+
+type GetOne<T extends Sub | Collection | Share> = (name: string) => T;

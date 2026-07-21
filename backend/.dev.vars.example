@@ -1,0 +1,4 @@
+# Copy this file to backend/.dev.vars for local Wrangler development.
+# Do not commit the real .dev.vars file.
+SUB_STORE_ADMIN_USERNAME=admin
+SUB_STORE_ADMIN_PASSWORD=replace-with-a-long-unique-password
