@@ -71,8 +71,12 @@ export const useHostAPI = () => {
     return apis.value.find(api => api.name === currentName.value);
   });
   const currentUrl = computed(() => {
-    const url = currentApi.value?.url ?? defaultAPI
-    return url.startsWith('/') ? `${window.location.origin}${url}` : url;
+    const url = currentApi.value?.url ?? defaultAPI;
+    const absoluteUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
+    // Preview/download URLs append `/download/...`; remove every trailing
+    // slash so an API URL entered as `https://host/` cannot produce
+    // `https://host//download/...`.
+    return absoluteUrl.replace(/\/+$/, '');
   });
   const currentShareBaseUrl = computed(() => {
     return normalizeShareBaseUrl(currentApi.value?.shareBaseUrl);
