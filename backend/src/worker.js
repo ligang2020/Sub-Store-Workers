@@ -68,6 +68,13 @@ export default {
             return handleAuthRequest(request, url, auth);
         }
 
+        // Subscription and share URLs are consumed by client applications, which
+        // cannot use the browser-only administrator session. Their own resource
+        // names/share tokens remain the access controls exposed by Sub-Store.
+        if (isPublicBackendRoute(url.pathname)) {
+            return fetchBackend(request, env);
+        }
+
         if (!auth.isConfigured) {
             return configurationRequiredResponse(request);
         }
@@ -78,13 +85,22 @@ export default {
         }
 
         if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
-            const id = env.SUB_STORE_BACKEND.idFromName(DEFAULT_INSTANCE);
-            return env.SUB_STORE_BACKEND.get(id).fetch(request);
+            return fetchBackend(request, env);
         }
 
         return env.SUB_STORE_ASSETS.fetch(request);
     },
 };
+
+function isPublicBackendRoute(pathname) {
+    return pathname === '/download' || pathname.startsWith('/download/')
+        || pathname === '/share' || pathname.startsWith('/share/');
+}
+
+function fetchBackend(request, env) {
+    const id = env.SUB_STORE_BACKEND.idFromName(DEFAULT_INSTANCE);
+    return env.SUB_STORE_BACKEND.get(id).fetch(request);
+}
 
 function getAuthConfig(env) {
     const username = `${env.SUB_STORE_ADMIN_USERNAME || 'admin'}`;

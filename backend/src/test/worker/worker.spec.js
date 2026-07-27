@@ -66,6 +66,11 @@ describe('Cloudflare Workers login gateway', () => {
                 const rejectedApi = await worker.fetch(new Request('https://example.test/api/utils/env'), env);
                 if (rejectedApi.status !== 401) throw new Error('Unauthenticated API request was not rejected.');
 
+                const publicDownload = await worker.fetch(new Request('https://example.test/download/test-subscription'), env);
+                if (publicDownload.status !== 200 || await publicDownload.text() !== 'api content') {
+                    throw new Error('Public subscription download was not forwarded.');
+                }
+
                 const login = await worker.fetch(new Request('https://example.test/__substore/auth/login', {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },

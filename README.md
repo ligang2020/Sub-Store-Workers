@@ -4,6 +4,8 @@
 
 > Worker 使用同一域名提供管理前端和 API，并内置仅“用户名 + 密码”的登录保护；**没有图片验证码**。
 
+当前部署域名：`https://substore.ligangs2025.top`。
+
 ## 架构
 
 - Worker 使用 Cloudflare Assets 提供已打包、随 `backend/assets/` 一同提交的官方 Sub-Store 管理前端，并将 `/api/*` 请求转发到名为 `default` 的单一 Durable Object。

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sub-store-workers",
+  "name": "sub-store-ligangs2025",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-21",
   "compatibility_flags": ["nodejs_compat"],
@@ -25,6 +25,12 @@
     }
   ],
   "vars": {
-    "SUB_STORE_CORS_ALLOWED_ORIGINS": "*"
-  }
+    "SUB_STORE_CORS_ALLOWED_ORIGINS": "https://substore.ligangs2025.top"
+  },
+  "routes": [
+    {
+      "pattern": "substore.ligangs2025.top",
+      "custom_domain": true
+    }
+  ]
 }
