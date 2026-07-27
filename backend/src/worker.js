@@ -61,7 +61,17 @@ export class SubStoreBackend {
  */
 export default {
     async fetch(request, env) {
-        const url = new URL(request.url);
+        let url = new URL(request.url);
+
+        // Some clients keep a trailing slash in the configured base URL and
+        // concatenate it with `/download/...`. Normalize the resulting
+        // `//download/...` path before routing so public subscription URLs
+        // never fall through to the authenticated front-end gateway.
+        if (url.pathname.startsWith('//')) {
+            url.pathname = url.pathname.replace(/^\/+/, '/');
+            request = new Request(url.toString(), request);
+        }
+
         const auth = getAuthConfig(env);
 
         if (url.pathname.startsWith(AUTH_BASE_PATH)) {

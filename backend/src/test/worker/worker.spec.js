@@ -71,6 +71,11 @@ describe('Cloudflare Workers login gateway', () => {
                     throw new Error('Public subscription download was not forwarded.');
                 }
 
+                const doubleSlashDownload = await worker.fetch(new Request('https://example.test//download/test-subscription'), env);
+                if (doubleSlashDownload.status !== 200 || await doubleSlashDownload.text() !== 'api content') {
+                    throw new Error('Double-slash subscription download was not normalized and forwarded.');
+                }
+
                 const login = await worker.fetch(new Request('https://example.test/__substore/auth/login', {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
