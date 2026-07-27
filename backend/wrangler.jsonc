@@ -25,7 +25,8 @@
     }
   ],
   "vars": {
-    "SUB_STORE_CORS_ALLOWED_ORIGINS": "https://substore.ligangs2025.top"
+    "SUB_STORE_CORS_ALLOWED_ORIGINS": "https://substore.ligangs2025.top",
+    "SUB_STORE_ADMIN_USERNAME": "gang"
   },
   "routes": [
     {
