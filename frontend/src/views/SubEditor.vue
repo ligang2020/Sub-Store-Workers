@@ -899,7 +899,7 @@ const selectedSubsDisplay = computed(() => selectedSubs.value.replace(/^:\s*/, "
   };
   const subFailureModeValue = computed(() => {
     return form.ignoreFailedRemoteSub === false || form.ignoreFailedRemoteSub == null
-      ? "disabled"
+      ? "fallbackQuiet"
       : form.ignoreFailedRemoteSub;
   });
   const subFailureModeColumns = computed(() => {
@@ -998,9 +998,7 @@ watchEffect(() => {
   let ignoreFailedRemoteSub = sourceData.ignoreFailedRemoteSub;
   if (ignoreFailedRemoteSub === true) {
     ignoreFailedRemoteSub = 'quiet';
-  } else if (ignoreFailedRemoteSub === false) {
-    ignoreFailedRemoteSub = 'disabled';
-  } else if (ignoreFailedRemoteSub == null || ignoreFailedRemoteSub === '') {
+  } else if (ignoreFailedRemoteSub === false || ignoreFailedRemoteSub == null || ignoreFailedRemoteSub === '') {
     // Saved subscriptions from earlier releases do not have this field. Keep
     // their preview usable when an upstream is temporarily unavailable.
     ignoreFailedRemoteSub = 'fallbackQuiet';
@@ -1142,9 +1140,6 @@ const fetchCompareData = async () => {
   try {
     const data: any = JSON.parse(JSON.stringify(toRaw(form)));
     data.process = actionsToProcess(data.process, actionsList, ignoreList);
-    if (data.ignoreFailedRemoteSub === "disabled") {
-      data.ignoreFailedRemoteSub = false;
-    }
     if (editType === "collections") {
       data.firstSubFlow = data.firstSubFlow !== false;
     } else {
@@ -1317,9 +1312,6 @@ const submit = () => {
     ];
     data["display-name"] = data.displayName;
     data.process = actionsToProcess(data.process, actionsList, ignoreList);
-    if (data.ignoreFailedRemoteSub === "disabled"){
-      data.ignoreFailedRemoteSub = false;
-    }
     if (editType === "collections") {
       data.firstSubFlow = data.firstSubFlow !== false;
     } else {

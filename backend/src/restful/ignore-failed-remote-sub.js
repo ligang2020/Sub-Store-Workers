@@ -11,7 +11,12 @@ const IGNORE_FAILED_REMOTE_SUB_FALLBACK_MODES = new Set([
 
 function normalizeIgnoreFailedRemoteSub(mode) {
     if (mode === true) return 'quiet';
-    if (mode === false || mode == null || mode === '') return 'disabled';
+    // Historical configurations persisted `false` before this setting gained
+    // explicit modes. Treat it as the safe fallback, not as an instruction to
+    // show a hard error for an unavailable upstream. New strict settings use
+    // the explicit string value `disabled`.
+    if (mode === false) return 'fallbackQuiet';
+    if (mode == null || mode === '') return 'disabled';
     return mode;
 }
 
@@ -24,8 +29,7 @@ function resolveIgnoreFailedRemoteSubMode(...values) {
 
     // Existing subscriptions created before this setting was introduced have no
     // value. Treat those as a quiet fallback so one unavailable upstream does
-    // not turn a preview, collection, or generated subscription into a 500.
-    // An explicit `false` still keeps the previous strict-error behavior.
+    // not turn a preview, collection, or generated subscription into an error.
     return 'fallbackQuiet';
 }
 

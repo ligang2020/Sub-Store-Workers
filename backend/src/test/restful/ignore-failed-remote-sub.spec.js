@@ -14,7 +14,11 @@ describe('remote subscription failure mode', function () {
         expect(shouldFallbackIgnoreFailedRemoteSub(mode)).to.equal(true);
     });
 
-    it('keeps an explicitly disabled setting strict', function () {
-        expect(resolveIgnoreFailedRemoteSubMode(false)).to.equal('disabled');
+    it('uses a quiet fallback for legacy subscriptions that persisted false', function () {
+        expect(resolveIgnoreFailedRemoteSubMode(false)).to.equal('fallbackQuiet');
+    });
+
+    it('keeps the explicit disabled mode strict', function () {
+        expect(resolveIgnoreFailedRemoteSubMode('disabled')).to.equal('disabled');
     });
 });
