@@ -28,6 +28,7 @@ const clashPreprocessor = PROXY_PREPROCESSORS.find(
 );
 
 const tasks = new Map();
+const COMPATIBILITY_SUBSCRIPTION_USER_AGENT = 'clash.meta/v1.19.23';
 
 function buildDownloadRegex(pattern = '') {
     const trimmed = `${pattern}`.trim();
@@ -125,6 +126,22 @@ function formatPlainDownloadResult(result, returnRaw) {
     return returnRaw ? { result, raw: result } : result;
 }
 
+function getHeaderValue(headers, name) {
+    if (!headers || typeof headers !== 'object') return '';
+    const target = name.toLowerCase();
+    const key = Object.keys(headers).find(
+        (item) => item.toLowerCase() === target,
+    );
+    const value = key ? headers[key] : undefined;
+    return Array.isArray(value) ? value.join(', ') : `${value || ''}`;
+}
+
+function isLikelyHtmlResponse(body, headers) {
+    const contentType = getHeaderValue(headers, 'content-type');
+    if (/\btext\/html\b/i.test(contentType)) return true;
+    return /^\s*(?:<!doctype\s+html|<html\b)/i.test(`${body || ''}`);
+}
+
 export default async function download(
     rawUrl = '',
     ua,
@@ -177,7 +194,8 @@ export default async function download(
     if ($.env.isNode) {
         proxy = proxy || eval('process.env.SUB_STORE_BACKEND_DEFAULT_PROXY');
     }
-    const userAgent = ua || defaultUserAgent || 'clash.meta/v1.19.23';
+    const userAgent =
+        ua || defaultUserAgent || COMPATIBILITY_SUBSCRIPTION_USER_AGENT;
     let customHeaders;
     if ($arguments?.headers) {
         try {
@@ -247,9 +265,9 @@ export default async function download(
                     );
                 } catch (e) {
                     $.error(
-                        `乐观缓存: URL ${safeUrl} 更新缓存发生错误 ${
-                            maskRemoteUrlsInText(e.message ?? e)
-                        }`,
+                        `乐观缓存: URL ${safeUrl} 更新缓存发生错误 ${maskRemoteUrlsInText(
+                            e.message ?? e,
+                        )}`,
                     );
                     $.info('使用乐观缓存的数据刷新缓存, 防止后续请求');
                     resourceCache.set(id, customCached);
@@ -269,9 +287,9 @@ export default async function download(
                     preprocess,
                 ).catch((e) => {
                     $.error(
-                        `乐观缓存: URL ${safeUrl} 异步更新缓存发生错误 ${
-                            maskRemoteUrlsInText(e.message ?? e)
-                        }`,
+                        `乐观缓存: URL ${safeUrl} 异步更新缓存发生错误 ${maskRemoteUrlsInText(
+                            e.message ?? e,
+                        )}`,
                     );
                 });
             }
@@ -433,6 +451,43 @@ export default async function download(
                 preprocess,
                 url: safeUrl,
             });
+
+            // Some subscription services return their website for a generic
+            // client UA but return a valid Clash profile for a compatible one.
+            // Retry once only when the first response is HTML and has no nodes.
+            // Explicit custom headers are left untouched.
+            if (
+                preprocess &&
+                !customHeaders &&
+                !options?.compatibilityUserAgentRetried &&
+                userAgent !== COMPATIBILITY_SUBSCRIPTION_USER_AGENT &&
+                !result.shouldCache &&
+                isLikelyHtmlResponse(body, headers)
+            ) {
+                try {
+                    $.info(
+                        `订阅响应为 HTML 且未包含节点，使用兼容 User-Agent 重试: ${safeUrl}`,
+                    );
+                    return await download(
+                        rawUrl,
+                        COMPATIBILITY_SUBSCRIPTION_USER_AGENT,
+                        timeout,
+                        customProxy,
+                        true,
+                        undefined,
+                        true,
+                        preprocess,
+                        { ...options, compatibilityUserAgentRetried: true },
+                    );
+                } catch (retryError) {
+                    $.error(
+                        `兼容 User-Agent 重试失败，保留原始响应: ${
+                            retryError.message ?? retryError
+                        }`,
+                    );
+                }
+            }
+
             let shouldCache = true;
             if (cacheThreshold) {
                 const size = body.length / 1024;
@@ -471,9 +526,9 @@ export default async function download(
                 const cached = $.read(customCacheKey);
                 if (cached) {
                     $.info(
-                        `无法下载 URL ${safeUrl}: ${
-                            maskRemoteUrlsInText(e.message ?? e)
-                        }\n使用自定义缓存 ${$arguments?.cacheKey}`,
+                        `无法下载 URL ${safeUrl}: ${maskRemoteUrlsInText(
+                            e.message ?? e,
+                        )}\n使用自定义缓存 ${$arguments?.cacheKey}`,
                     );
                     return formatDownloadResult(
                         await finalizeDownloadedBody(cached, {
@@ -486,7 +541,9 @@ export default async function download(
                 }
             }
             throw new Error(
-                `无法下载 URL ${safeUrl}: ${maskRemoteUrlsInText(e.message ?? e)}`,
+                `无法下载 URL ${safeUrl}: ${maskRemoteUrlsInText(
+                    e.message ?? e,
+                )}`,
             );
         }
     }
@@ -508,7 +565,9 @@ export default async function download(
         );
     }
 
-    if (!isNode) {
+    if (!isNode && rawResult && result?.shouldCache) {
+        // Do not pin an HTML error page or an empty profile in the Worker
+        // in-memory task cache. A later request may receive a valid profile.
         tasks.set(id, rawResult);
     }
     return formatDownloadResult(result, returnRaw);
