@@ -396,6 +396,33 @@ function maskAgeSecretInUrl(value) {
     );
 }
 
+// Remote subscription URLs commonly carry credentials in either the query
+// string or an opaque path. They must not be echoed in API responses, logs, or
+// notifications. Keep the origin so an administrator can identify the source
+// without exposing a reusable subscription link.
+function maskRemoteUrl(value) {
+    const raw = maskAgeSecretInUrl(value).trim();
+    if (!raw) return raw;
+
+    try {
+        const url = new URL(raw);
+        return `${url.protocol}//${url.host}/…`;
+    } catch {
+        return raw
+            .replace(/([?#&](?:access[_-]?token|api[_-]?key|auth(?:orization)?|key|password|passwd|secret|signature|sig|token)=)[^&#\s]+/gi, '$1***')
+            .replace(/(https?:\/\/)[^\s/?#]+(?::[^\s/?#]+)?[^\s]*/gi, '$1***');
+    }
+}
+
+function maskRemoteUrlsInText(value) {
+    return maskAgeSecret(String(value ?? ''))
+        .replace(/https?:\/\/[^\s<>'"`]+/gi, (url) => maskRemoteUrl(url))
+        .replace(
+            /([?#&](?:access[_-]?token|api[_-]?key|auth(?:orization)?|key|password|passwd|secret|signature|sig|token)=)[^&#\s]+/gi,
+            '$1***',
+        );
+}
+
 export {
     AGE_ARMOR_HEADER,
     AGE_KEY_TYPES,
@@ -409,6 +436,8 @@ export {
     isAgeArmor,
     maskAgeSecret,
     maskAgeSecretInUrl,
+    maskRemoteUrl,
+    maskRemoteUrlsInText,
     normalizeAgePublicKeyConfig,
     normalizeAgeSecretKeyConfig,
     validateIdentity,

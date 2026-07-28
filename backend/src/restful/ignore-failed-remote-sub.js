@@ -22,7 +22,11 @@ function resolveIgnoreFailedRemoteSubMode(...values) {
         }
     }
 
-    return 'disabled';
+    // Existing subscriptions created before this setting was introduced have no
+    // value. Treat those as a quiet fallback so one unavailable upstream does
+    // not turn a preview, collection, or generated subscription into a 500.
+    // An explicit `false` still keeps the previous strict-error behavior.
+    return 'fallbackQuiet';
 }
 
 function shouldNotifyIgnoreFailedRemoteSub(mode) {

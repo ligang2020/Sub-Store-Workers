@@ -21,7 +21,7 @@ import {
     resolveShareAgeConfig,
 } from '@/restful/age-output';
 import { findShareToken } from '@/restful/token';
-import { maskAgeSecretInUrl } from '@/utils/age';
+import { maskRemoteUrl } from '@/utils/age';
 
 function buildEmptyNezhaPayload() {
     return JSON.stringify(
@@ -240,7 +240,7 @@ async function downloadSubscription(req, res) {
         return;
     }
     if (url) {
-        $.info(`指定远程订阅 URL: ${maskAgeSecretInUrl(url)}`);
+        $.info(`指定远程订阅 URL: ${maskRemoteUrl(url)}`);
         if (!/^https?:\/\//.test(url)) {
             content = url;
             $.info(`URL 不是链接，视为本地订阅`);

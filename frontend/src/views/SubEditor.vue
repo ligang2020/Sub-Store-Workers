@@ -942,7 +942,7 @@ const form = reactive<any>({
   form: "",
   remark: "",
   mergeSources: "",
-  ignoreFailedRemoteSub: false,
+  ignoreFailedRemoteSub: "fallbackQuiet",
   passThroughUA: false,
   icon: "",
   isIconColor: true,
@@ -998,8 +998,12 @@ watchEffect(() => {
   let ignoreFailedRemoteSub = sourceData.ignoreFailedRemoteSub;
   if (ignoreFailedRemoteSub === true) {
     ignoreFailedRemoteSub = 'quiet';
-  } else if (ignoreFailedRemoteSub === false || ignoreFailedRemoteSub == null) {
+  } else if (ignoreFailedRemoteSub === false) {
     ignoreFailedRemoteSub = 'disabled';
+  } else if (ignoreFailedRemoteSub == null || ignoreFailedRemoteSub === '') {
+    // Saved subscriptions from earlier releases do not have this field. Keep
+    // their preview usable when an upstream is temporarily unavailable.
+    ignoreFailedRemoteSub = 'fallbackQuiet';
   }
   form.ignoreFailedRemoteSub = ignoreFailedRemoteSub;
   form.passThroughUA = sourceData.passThroughUA;

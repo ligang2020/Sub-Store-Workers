@@ -38,12 +38,42 @@ const stringifyUnknown = (value: unknown) => {
   }
 };
 
+
+const MAX_ERROR_CONTENT_LENGTH = 600;
+
+const maskUrlInErrorText = (value: string) => {
+  return value
+    .replace(/https?:\/\/[^\s<>'"`]+/gi, (rawUrl) => {
+      try {
+        const url = new URL(rawUrl);
+        return `${url.protocol}//${url.host}/…`;
+      } catch {
+        return 'URL 已隐藏';
+      }
+    })
+    .replace(
+      /([?#&](?:access[_-]?token|api[_-]?key|auth(?:orization)?|key|password|passwd|secret|signature|sig|token)=)[^&#\s]+/gi,
+      '$1***',
+    );
+};
+
+const formatErrorText = (value: unknown) => {
+  const text = getText(value);
+  if (!text)
+    return undefined;
+
+  const safeText = maskUrlInErrorText(text);
+  return safeText.length > MAX_ERROR_CONTENT_LENGTH
+    ? `${safeText.slice(0, MAX_ERROR_CONTENT_LENGTH)}…`
+    : safeText;
+};
+
 const getResponseTitle = (e: AxiosError<ErrorResponse>) => {
-  const backendMessage = getText(e.response?.data?.error?.message);
+  const backendMessage = formatErrorText(e.response?.data?.error?.message);
   if (backendMessage)
     return backendMessage;
 
-  const responseText = getText(e.response?.statusText);
+  const responseText = formatErrorText(e.response?.statusText);
   if (e.response?.status && responseText)
     return `请求失败: ${e.response.status} ${responseText}`;
 
@@ -59,17 +89,17 @@ const getResponseContent = (e: AxiosError<ErrorResponse>) => {
   const backendErrorLines = [
     getText(error?.code) ? `code: ${getText(error?.code)}` : undefined,
     getText(error?.type) ? `type: ${getText(error?.type)}` : undefined,
-    getText(error?.details),
+    formatErrorText(error?.details),
   ].filter(Boolean);
 
   if (backendErrorLines.length > 0)
     return [statusLine, ...backendErrorLines].filter(Boolean).join('\n');
 
-  const responseData = stringifyUnknown(e.response?.data);
+  const responseData = formatErrorText(stringifyUnknown(e.response?.data));
   if (responseData)
     return [statusLine, responseData].filter(Boolean).join('\n');
 
-  return [statusLine, getText(e.message)].filter(Boolean).join('\n') || undefined;
+  return [statusLine, formatErrorText(e.message)].filter(Boolean).join('\n') || undefined;
 };
 
 const isCanceledRequestError = (error: AxiosError<ErrorResponse>) => {

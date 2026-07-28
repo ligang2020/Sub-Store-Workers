@@ -19,7 +19,8 @@ import { runBackendRequestTask } from '@/utils/request-concurrency';
 import {
     AGE_SECRET_KEY,
     decryptArmorIfPresent,
-    maskAgeSecretInUrl,
+    maskRemoteUrl,
+    maskRemoteUrlsInText,
 } from '@/utils/age';
 
 const clashPreprocessor = PROXY_PREPROCESSORS.find(
@@ -65,7 +66,7 @@ function maybePrefixGithubProxyUrl(url, githubProxy, githubProxyRegex) {
 }
 
 function maskDownloadUrl(url) {
-    return maskAgeSecretInUrl(url);
+    return maskRemoteUrl(url);
 }
 
 async function finalizeDownloadedBody(body, { ageSecretKey, preprocess, url }) {
@@ -247,7 +248,7 @@ export default async function download(
                 } catch (e) {
                     $.error(
                         `乐观缓存: URL ${safeUrl} 更新缓存发生错误 ${
-                            e.message ?? e
+                            maskRemoteUrlsInText(e.message ?? e)
                         }`,
                     );
                     $.info('使用乐观缓存的数据刷新缓存, 防止后续请求');
@@ -269,7 +270,7 @@ export default async function download(
                 ).catch((e) => {
                     $.error(
                         `乐观缓存: URL ${safeUrl} 异步更新缓存发生错误 ${
-                            e.message ?? e
+                            maskRemoteUrlsInText(e.message ?? e)
                         }`,
                     );
                 });
@@ -471,7 +472,7 @@ export default async function download(
                 if (cached) {
                     $.info(
                         `无法下载 URL ${safeUrl}: ${
-                            e.message ?? e
+                            maskRemoteUrlsInText(e.message ?? e)
                         }\n使用自定义缓存 ${$arguments?.cacheKey}`,
                     );
                     return formatDownloadResult(
@@ -484,7 +485,9 @@ export default async function download(
                     );
                 }
             }
-            throw new Error(`无法下载 URL ${safeUrl}: ${e.message ?? e}`);
+            throw new Error(
+                `无法下载 URL ${safeUrl}: ${maskRemoteUrlsInText(e.message ?? e)}`,
+            );
         }
     }
 

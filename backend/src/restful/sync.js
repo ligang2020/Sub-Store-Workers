@@ -31,7 +31,7 @@ import {
 } from '@/restful/ignore-failed-remote-sub';
 import { normalizeClashYaml } from '@/core/proxy-utils/preprocessors';
 import { applyAgeOutputEncryption } from '@/restful/age-output';
-import { maskAgeSecretInUrl } from '@/utils/age';
+import { maskRemoteUrl } from '@/utils/age';
 import { isMihomoConfigFile, normalizeFileConfig } from '@/utils/file-type';
 
 export default function register($app) {
@@ -53,8 +53,8 @@ const MIHOMO_CONFIG_SOURCE_TYPES = [
     'subscription',
 ];
 
-function formatAgeSafeUrls(errors) {
-    return Object.keys(errors).map(maskAgeSecretInUrl).join(', ');
+function formatSafeRemoteUrls(errors) {
+    return Object.keys(errors).map(maskRemoteUrl).join(', ');
 }
 
 function isMergeSourceMode(mode) {
@@ -124,7 +124,7 @@ async function downloadFileSources({
             } catch (err) {
                 errors[url] = err;
                 $.error(
-                    `文件 ${file.name} 的远程文件 ${maskAgeSecretInUrl(
+                    `文件 ${file.name} 的远程文件 ${maskRemoteUrl(
                         url,
                     )} 发生错误: ${err}`,
                 );
@@ -141,7 +141,7 @@ async function downloadFileSources({
     if (Object.keys(errors).length > 0) {
         if (!fileIgnoreFailedRemoteFile) {
             throw new Error(
-                `文件 ${file.name} 的远程文件 ${formatAgeSafeUrls(
+                `文件 ${file.name} 的远程文件 ${formatSafeRemoteUrls(
                     errors,
                 )} 发生错误, 请查看日志`,
             );
@@ -149,7 +149,7 @@ async function downloadFileSources({
             $.notify(
                 notifyTitle,
                 `❌ ${file.name}`,
-                `远程文件 ${formatAgeSafeUrls(errors)} 发生错误, 请查看日志`,
+                `远程文件 ${formatSafeRemoteUrls(errors)} 发生错误, 请查看日志`,
             );
         }
     }
@@ -331,7 +331,7 @@ async function produceArtifact({
                             } catch (err) {
                                 errors[url] = err;
                                 $.error(
-                                    `订阅 ${sub.name} 的远程订阅 ${maskAgeSecretInUrl(
+                                    `订阅 ${sub.name} 的远程订阅 ${maskRemoteUrl(
                                         url,
                                     )} 发生错误: ${err}`,
                                 );
@@ -345,7 +345,7 @@ async function produceArtifact({
                 if (Object.keys(errors).length > 0) {
                     const message = `订阅 ${
                         sub.name
-                    } 的远程订阅 ${formatAgeSafeUrls(
+                    } 的远程订阅 ${formatSafeRemoteUrls(
                         errors,
                     )} 发生错误, 请查看日志`;
                     handleIgnoreFailedRemoteSubError({
@@ -396,7 +396,7 @@ async function produceArtifact({
                             } catch (err) {
                                 errors[url] = err;
                                 $.error(
-                                    `订阅 ${sub.name} 的远程订阅 ${maskAgeSecretInUrl(
+                                    `订阅 ${sub.name} 的远程订阅 ${maskRemoteUrl(
                                         url,
                                     )} 发生错误: ${err}`,
                                 );
@@ -410,7 +410,7 @@ async function produceArtifact({
                 if (Object.keys(errors).length > 0) {
                     const message = `订阅 ${
                         sub.name
-                    } 的远程订阅 ${formatAgeSafeUrls(
+                    } 的远程订阅 ${formatSafeRemoteUrls(
                         errors,
                     )} 发生错误, 请查看日志`;
                     handleIgnoreFailedRemoteSubError({
@@ -540,8 +540,11 @@ async function produceArtifact({
             await Promise.all(
                 subnames.map(async (name) => {
                     const sub = findByName(allSubs, name);
+                    // A collection-level policy applies to legacy child subscriptions
+                    // that do not define their own policy.
                     const subMode = resolveIgnoreFailedRemoteSubMode(
                         sub.ignoreFailedRemoteSub,
+                        collectionIgnoreFailedRemoteSub,
                     );
                     const passThroughUA = sub.passThroughUA;
                     let reqUA = sub.ua;
@@ -590,7 +593,7 @@ async function produceArtifact({
                                             $.error(
                                                 `订阅 ${
                                                     sub.name
-                                                } 的远程订阅 ${maskAgeSecretInUrl(
+                                                } 的远程订阅 ${maskRemoteUrl(
                                                     url,
                                                 )} 发生错误: ${err}`,
                                             );
@@ -604,7 +607,7 @@ async function produceArtifact({
                             if (Object.keys(errors).length > 0) {
                                 const message = `订阅 ${
                                     sub.name
-                                } 的远程订阅 ${formatAgeSafeUrls(
+                                } 的远程订阅 ${formatSafeRemoteUrls(
                                     errors,
                                 )} 发生错误, 请查看日志`;
                                 handleIgnoreFailedRemoteSubError({

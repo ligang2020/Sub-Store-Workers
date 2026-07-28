@@ -23,7 +23,7 @@ import {
     resolveShareAgeConfig,
 } from '@/restful/age-output';
 import { findShareToken } from '@/restful/token';
-import { maskAgeSecretInUrl, normalizeAgePublicKeyConfig } from '@/utils/age';
+import { maskRemoteUrl, normalizeAgePublicKeyConfig } from '@/utils/age';
 import { normalizeEditorLanguageConfig } from '@/utils/editor-language';
 import {
     isMihomoConfigFile,
@@ -209,7 +209,7 @@ async function getFile(req, res, next) {
         return;
     }
     if (url) {
-        $.info(`指定远程文件 URL: ${maskAgeSecretInUrl(url)}`);
+        $.info(`指定远程文件 URL: ${maskRemoteUrl(url)}`);
     }
     if (_fakeFile) {
         $.info(`使用假文件, 不再通过单个文件名称 ${name} 查询`);

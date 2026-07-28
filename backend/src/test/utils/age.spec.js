@@ -11,6 +11,8 @@ import {
     generateKeyPair,
     maskAgeSecret,
     maskAgeSecretInUrl,
+    maskRemoteUrl,
+    maskRemoteUrlsInText,
     normalizeAgePublicKeyConfig,
     validateIdentity,
     validateRecipient,
@@ -110,6 +112,20 @@ describe('age utility', function () {
 
         expect(masked).to.not.contain(secretKey);
         expect(masked).to.contain('age-secret-key=***');
+    });
+
+
+    it('redacts remote subscription URLs and credentials in error text', function () {
+        const url =
+            'https://provider.example/s/opaque-subscription-id?token=super-secret&key=another-secret';
+        const maskedUrl = maskRemoteUrl(url);
+        const maskedText = maskRemoteUrlsInText(`download failed: ${url}`);
+
+        expect(maskedUrl).to.equal('https://provider.example/…');
+        expect(maskedUrl).to.not.contain('super-secret');
+        expect(maskedText).to.not.contain('opaque-subscription-id');
+        expect(maskedText).to.not.contain('super-secret');
+        expect(maskedText).to.contain('https://provider.example/…');
     });
 
     it('normalizes optional age-public-key config fields', async function () {

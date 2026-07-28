@@ -26,7 +26,7 @@ import { archiveSubscription } from '@/utils/archive';
 import { success, failed } from './response';
 import $ from '@/core/app';
 import { formatDateTime } from '@/utils';
-import { maskAgeSecretInUrl, normalizeAgePublicKeyConfig } from '@/utils/age';
+import { maskRemoteUrl, normalizeAgePublicKeyConfig } from '@/utils/age';
 import { normalizeEditorLanguageConfig } from '@/utils/editor-language';
 
 if (!$.read(SUBS_KEY)) $.write({}, SUBS_KEY);
@@ -50,7 +50,7 @@ async function getFlowInfo(req, res) {
     let { name } = req.params;
     let { url } = req.query;
     if (url) {
-        $.info(`指定远程订阅 URL: ${maskAgeSecretInUrl(url)}`);
+        $.info(`指定远程订阅 URL: ${maskRemoteUrl(url)}`);
     }
     const allSubs = $.read(SUBS_KEY);
     const sub = findByName(allSubs, name);

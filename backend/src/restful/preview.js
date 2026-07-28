@@ -1,4 +1,4 @@
-import { InternalServerError } from './errors';
+import { InternalServerError, NetworkError } from './errors';
 import { ProxyUtils } from '@/core/proxy-utils';
 import { findByName } from '@/utils/database';
 import { success, failed } from './response';
@@ -17,11 +17,11 @@ import {
     resolveFileRawContent,
 } from '@/restful/sync';
 import { normalizeClashYaml } from '@/core/proxy-utils/preprocessors';
-import { maskAgeSecretInUrl } from '@/utils/age';
+import { maskRemoteUrl } from '@/utils/age';
 import { isMihomoConfigFile, normalizeFileConfig } from '@/utils/file-type';
 
-function formatAgeSafeUrls(errors) {
-    return Object.keys(errors).map(maskAgeSecretInUrl).join(', ');
+function formatSafeRemoteUrls(errors) {
+    return Object.keys(errors).map(maskRemoteUrl).join(', ');
 }
 
 export default function register($app) {
@@ -113,7 +113,7 @@ async function compareSub(req, res) {
                         } catch (err) {
                             errors[url] = err;
                             $.error(
-                                `订阅 ${sub.name} 的远程订阅 ${maskAgeSecretInUrl(
+                                `订阅 ${sub.name} 的远程订阅 ${maskRemoteUrl(
                                     url,
                                 )} 发生错误: ${err}`,
                             );
@@ -127,20 +127,25 @@ async function compareSub(req, res) {
             if (Object.keys(errors).length > 0) {
                 const message = `订阅 ${
                     sub.name
-                } 的远程订阅 ${formatAgeSafeUrls(
+                } 的远程订阅 ${formatSafeRemoteUrls(
                     errors,
                 )} 发生错误, 请查看日志`;
-                handleIgnoreFailedRemoteSubError({
-                    mode,
-                    message,
-                    notify: () => {
-                        $.notify(
-                            `🌍 Sub-Store 预览订阅失败`,
-                            `❌ ${sub.name}`,
-                            message,
-                        );
-                    },
-                });
+                try {
+                    handleIgnoreFailedRemoteSubError({
+                        mode,
+                        message,
+                        notify: () => {
+                            $.notify(
+                                `🌍 Sub-Store 预览订阅失败`,
+                                `❌ ${sub.name}`,
+                                message,
+                            );
+                        },
+                    });
+                } catch (error) {
+                    error.isRemoteSubscriptionUnavailable = true;
+                    throw error;
+                }
             }
             if (sub.mergeSources === 'localFirst') {
                 content.unshift(sub.content);
@@ -197,6 +202,19 @@ async function compareSub(req, res) {
         }
 
         $.error(err.message ?? err);
+        if (err?.isRemoteSubscriptionUnavailable) {
+            failed(
+                res,
+                new NetworkError(
+                    `REMOTE_SUBSCRIPTION_UNAVAILABLE`,
+                    `无法获取远程订阅`,
+                    `订阅 ${sub.name} 的远程订阅不可用。请检查链接、访问限制或代理设置后重试。`,
+                ),
+                502,
+            );
+            return;
+        }
+
         failed(
             res,
             new InternalServerError(
@@ -236,8 +254,11 @@ async function compareCollection(req, res) {
         await Promise.all(
             subnames.map(async (name) => {
                 const sub = findByName(allSubs, name);
+                // A collection-level policy applies to legacy child subscriptions
+                // that do not define their own policy.
                 const subMode = resolveIgnoreFailedRemoteSubMode(
                     sub.ignoreFailedRemoteSub,
+                    collectionMode,
                 );
                 try {
                     let raw;
@@ -275,7 +296,7 @@ async function compareCollection(req, res) {
                                         $.error(
                                             `订阅 ${
                                                 sub.name
-                                            } 的远程订阅 ${maskAgeSecretInUrl(
+                                            } 的远程订阅 ${maskRemoteUrl(
                                                 url,
                                             )} 发生错误: ${err}`,
                                         );
@@ -289,7 +310,7 @@ async function compareCollection(req, res) {
                         if (Object.keys(errors).length > 0) {
                             const message = `订阅 ${
                                 sub.name
-                            } 的远程订阅 ${formatAgeSafeUrls(
+                            } 的远程订阅 ${formatSafeRemoteUrls(
                                 errors,
                             )} 发生错误, 请查看日志`;
                             handleIgnoreFailedRemoteSubError({
